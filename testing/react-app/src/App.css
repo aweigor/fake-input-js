@@ -1,0 +1,12 @@
+.App {}
+
+.App-header {}
+
+.receiver-container {
+  width: 300px;
+  height: 200px;
+  border: 0;
+  border-radius: 5px;
+  margin: 30px;
+  background: #eee;
+}
