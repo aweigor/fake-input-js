@@ -29,7 +29,7 @@ const getSymbol = function ( code = 65, altKey = false, shiftKey = false, locale
     result = keyCodes['shift'][ keyIndex ];
   }
 
-  return result
+  return result;
 }
 
 const codes = [ 81, 87, 69, 82, 84, 89 ];
