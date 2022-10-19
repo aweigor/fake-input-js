@@ -1,4 +1,4 @@
-class EventDispatcher {
+class InputProvider {
 
 	addEventListener( type, listener ) {
 
@@ -78,36 +78,4 @@ class EventDispatcher {
 	}
 
 }
-
-class InputProvider extends EventDispatcher {
-
-  constructor ( options, { keydownListener } ) {
-    super();
-  }
-  
-
-  static initialize ( options ) 
-  {
-    const eventDispatcher = new EventDispatcher();
-    
-
-    const keydownListener = function ( event ) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      eventDispatcher.dispatchEvent( event )  
-    }
-
-    eventDispatcher.addEventListener( 'keydown', keydownListener );
-
-    document.addEventListener( 'keydown', keydownListener )
-
-    return new InputProvider( options, { keydownListener } );
-  }
-
-}
-
-InputProvider.prototype.constructor = InputProvider;
-
-export { InputProvider }
 
