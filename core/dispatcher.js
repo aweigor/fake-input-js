@@ -1,4 +1,4 @@
-class InputProvider {
+export default class EventDispatcher {
 
 	addEventListener( type, listener ) {
 
