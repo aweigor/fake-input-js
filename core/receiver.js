@@ -1,23 +1,14 @@
 import EventDispatcher from './dispatcher.js';
+import { BasicProvider } from './providers/index.js';
 
 let instance;
 
 const _keyupEvent = {
-  type: 'keyup',
-  originalEvent: null
+  type: 'keyup'
 }
 
 const _keydownEvent = {
-  type: 'keydown',
-  originalEvent: null
-}
-
-const validateOptions = ( options ) => {
-  if (options.onKeyDown && !(options.onKeyDown instanceof Function )) return false;
-  if (options.onKeyUp && !(options.onKeyUp instanceof Function )) return false;
-  if (options.preventDefault && !(options.preventDefault instanceof Boolean)) return false;
-  if (options.stopPropagation && !(options.stopPropagation instanceof Boolean)) return false;
-  return true;
+  type: 'keydown'
 }
 
 export default class InputManager extends EventDispatcher {
@@ -28,23 +19,55 @@ export default class InputManager extends EventDispatcher {
 
     options = options||{};
 
-    class InvalidOptionsError extends Error {};
-    if (!validateOptions(options)) throw new InvalidOptionsError;
-
     this.element = element||document;
     this.settings = {
       preventDefault: options.preventDefault||true,
       stopPropagation: options.stopPropagation||true,
-      onKeyDown: options.onKeyDown||( (e) => { console.log('keydown',e) } ),
-      onKeyUp: options.onKeyUp||( (e) => { console.log('keyup',e) } )
     }
 
     this.dispose = function () {
       scope.element.removeEventListener( 'keydown', handleKeydown );
       scope.element.removeEventListener( 'keyup', handleKeyup );
 
-      scope.removeEventListener( 'keydown', this.settings.onKeyDown );
-      scope.removeEventListener( 'keyup', this.settings.onKeyUp );
+      if ( this._providers ) {
+        const keys = this._providers.map( p => p.key );
+        keys.forEach( providerKey => {
+          this.abandon( providerKey );
+        } )
+      }
+
+      instance = null;
+    }
+
+    this.use = function ( provider ) {
+      class InvalidProviderInterface extends Error {};
+      if (!provider instanceof BasicProvider) throw new InvalidProviderInterface;
+
+      if ( this._providers === undefined ) this._providers = [];
+
+      const providers = this._providers;
+
+      if ( providers.indexOf( provider ) === -1 ) {
+        providers.push( provider );
+      }
+
+      scope.addEventListener( 'keydown', provider.handleInput );
+      scope.addEventListener( 'keyup', provider.handleInput );
+    }
+
+    this.abandon = function ( providerKey ) {
+      if ( this._providers === undefined ) return;
+
+      const providers = this._providers;
+      const index = providers.findIndex( (p) => p.key === providerKey );
+
+      if ( index !== -1 ) {
+        
+        scope.removeEventListener( 'keydown', providers[index].handleInput );
+        scope.removeEventListener( 'keyup', providers[index].handleInput );
+        providers.splice( index, 1 );
+
+      }
     }
 
     const scope = this;
@@ -74,20 +97,17 @@ export default class InputManager extends EventDispatcher {
       
       scope.dispatchEvent( _keyupEvent );
     }
-
+    
     scope.element.addEventListener( 'keydown', handleKeydown );
     scope.element.addEventListener( 'keyup', handleKeyup );
 
-    scope.addEventListener( 'keydown', this.settings.onKeyDown );
-    scope.addEventListener( 'keyup', this.settings.onKeyUp );
-
   };
 
-  static initialize ( element, provider ) 
+  static initialize ( element, options ) 
   {
     if (instance) instance.dispose();
 
-    instance = new InputManager( element, provider );
+    instance = new InputManager( element, options );
 
     return instance;
   }
