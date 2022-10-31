@@ -44,7 +44,6 @@ export default class HttpProvider extends BufferProvider {
 
     if ( options.mode = 'every' ) {
       scope.handleBufferChange = function (state, buffer) {
-        console.log( 'change handled' )
       }
     }
   }
