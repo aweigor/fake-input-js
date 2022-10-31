@@ -1,4 +1,4 @@
-import BasicProvider from './basic-provider.js';
+import { BasicProvider } from '../index.js';
 
 export default class HtmlProvider extends BasicProvider {
   constructor ( options ) {

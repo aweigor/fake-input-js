@@ -18,9 +18,4 @@ export default class BasicProvider {
 
     const scope = this;
   }
-
-  
-
-  
-
 }
