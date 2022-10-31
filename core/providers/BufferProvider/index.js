@@ -10,7 +10,7 @@ const stateTemplate = {
 }
 
 class Buffer {
-  constructor ( options  ) {
+  constructor ( options, callback ) {
     options = options||{};
     options.maxSize = options.maxSize||10;
     options.onChange = options.onChange||function(){};
@@ -29,6 +29,7 @@ class Buffer {
       scope.state.timestamp = Date.now();
       const {history} = pushHistory( scope.state );
       options.onChange(scope.state,history);
+      callback(scope.state,history);
     }
   
     const scope = this;
@@ -52,17 +53,19 @@ export default class BufferProvider extends BasicProvider {
 
     super( options );
 
+    this._buffer = new Buffer( options.buffer, function onChange (state, buffer) {
+      scope.handleBufferChange( state, buffer )
+    } )
+
     this.onKeyDown = function ( event ) {
-      scope.buffer.syncState( event );
+      scope._buffer.syncState( event );
     }
   
     this.onKeyUp = function ( event ) {
-      scope.buffer.syncState( event );
+      scope._buffer.syncState( event );
     }
 
-    this._buffer = new Buffer( options.buffer )
-
-    this.getRecordsByInterval( timeStart, timeFinish ) = function() {
+    this.getRecordsByInterval = function ( timeStart, timeFinish ) {
       return scope._buffer.filter( state => {
         return state&&state.timestamp>=timestart&&state.timestamp<timeFinish;
       } )
@@ -76,9 +79,8 @@ export default class BufferProvider extends BasicProvider {
       return scope._buffer.filter( state => state );
     }
 
+    this.handleBufferChange = function (state, buffer) {}
+
     const scope = this;
-
   }
-
-  
 }
