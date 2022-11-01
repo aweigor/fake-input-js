@@ -1,0 +1,16 @@
+{
+  "top": 38,
+  "right": 39,
+  "bottom": 40,
+  "left": 37,
+  "enter": 13,
+  "backspace": 8,
+  "escape": 17,
+  "home": 36,
+  "end": 35,
+  "pageup": 33, 
+  "pagedown": 34,
+  "delete": 46,
+  "tab": 9,
+  "capslock": 20
+}

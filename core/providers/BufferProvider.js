@@ -1,4 +1,4 @@
-import { BasicProvider } from '../index.js';
+import BasicProvider from './BasicProvider.js';
 
 const stateTemplate = {
   type: String,

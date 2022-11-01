@@ -1,5 +1,24 @@
 const ANCII_codemap = require("./keyboards/ancii/codemap.json");
 const ANCII_locales = require("./keyboards/ancii/locales.json");
+const ANCII_arrowsmap = require("./keyboards/ancii/arrowsmap.json")
+
+/**
+ * 
+ * 
+ * 
+ *
+ * 
+ * 
+ * 
+ * 
+ * **/
+
+const defineType = function ( code ) {
+  if (!code||isNaN(code)) return;
+  if (ANCII_codemap.includes(code)) return 'symbol';
+  if (Object.values(ANCII_arrowsmap).includes(code)) return 'special';
+}
+
 
 /*
 * 
@@ -32,8 +51,15 @@ const getSymbol = function ( code = 65, altKey = false, shiftKey = false, locale
   return result;
 }
 
+const getSpecialKey = function ( code ) {
+  if (Object.keys(ANCII_arrowsmap).includes(code)) return ANCII_arrowsmap[code];
+  return;
+}
+
 const codes = [ 81, 87, 69, 82, 84, 89 ];
 
 for ( let code of codes ) {
   console.log ( getSymbol( code ) )
 }
+
+export { getSymbol, defineType, getSpecialKey }

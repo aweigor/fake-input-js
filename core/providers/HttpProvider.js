@@ -1,4 +1,4 @@
-import { BufferProvider } from '../index.js';
+import BufferProvider from './BufferProvider.js';
 
 const availableModes = [ 'every', 'interval', 'trigger' ]
 const defaultClientOptions = {

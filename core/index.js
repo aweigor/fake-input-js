@@ -1,4 +1,4 @@
-import { BasicProvider } from './providers/index.js';
+import BasicProvider from './providers/BasicProvider.js';
 
 let instance;
 
