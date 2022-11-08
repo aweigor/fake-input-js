@@ -1,44 +1,46 @@
 import BufferProvider from './BufferProvider.js';
 
-const availableModes = [ 'every', 'interval', 'trigger' ]
-const defaultClientOptions = {
-  method: 'POST',
-  baseUrl: '',
+/**
+ * 
+ * Client abstract
+ * 
+ * **/
+
+class Client {
+  constructor () {}
+
+  /**
+   * 
+   * Send data to server
+   * @param {Array} data - data passed to send function, based on HttpProvider Settings
+   * @returns {Promise} - response handling (optional)
+   * 
+   * **/
+
+  send ( data ) { console.log( 'sent', data ) }
 }
 
-class HttpClient {
-  constructor (options) {
-    this._options = options;
-  }
-
-  query (url = '', data = {}) {
-    const options = this._options;
-    const params = {
-      body: JSON.stringify(data)
-    }
-
-    return new Promise ( (resolve, reject) => {
-      fetch(url, Object.assign( {},params,options  )).then( res => {
-        if (res.status == 200) {
-          response.json().then( data => resolve(data) )
-        } else {
-          reject (res.status);
-        }
-      } );
-    } )
-  }
-}
+/**
+ * 
+ * Provides ability to send buffer data over http or something else;
+ * Requires Client module passed as constructor property; Client must be type of Client;
+ * 
+ * **/
 
 export default class HttpProvider extends BufferProvider {
-  constructor ( options ) {
-    options = options||{};
-    options.key = options.key||"html-provider";
-    options.mode = options.mode||'every'
-    options.client = options.client||defaultClientOptions;
+  constructor ( options ) 
+  {
+    const availableModes = [ 'every', 'interval', 'trigger' ];
+    
+    this.options = {
+      key: options.key||"html-provider",
+      mode: options.mode||"every",
+      client: options.client||new Client()
+    }
+
+    options = Object.assign( {}, this.options, options );
 
     super( options );
-
-    this.client = new HttpClient( options.client );
 
     const scope = this;
 
@@ -47,6 +49,4 @@ export default class HttpProvider extends BufferProvider {
       }
     }
   }
-
-  
 }

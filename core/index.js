@@ -29,7 +29,6 @@ class EventDispatcher {
 			listeners[ type ].push( listener );
 
 		}
-
 	}
 
 	hasEventListener( type, listener ) {
@@ -58,9 +57,7 @@ class EventDispatcher {
 				listenerArray.splice( index, 1 );
 
 			}
-
 		}
-
 	}
 
 	dispatchEvent( event ) {
@@ -85,9 +82,7 @@ class EventDispatcher {
 			event.target = null;
 
 		}
-
 	}
-
 }
 
 export default class InputManager extends EventDispatcher {

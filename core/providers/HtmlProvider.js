@@ -1,7 +1,7 @@
 import BasicProvider from './BasicProvider.js';
 
 
-export default class HtmlProvider extends BasicProvider {
+export default class HtmlProvider extends BufferProvider {
   constructor ( options ) {
     options = options||{};
     options.key = options.key||"html-provider";
