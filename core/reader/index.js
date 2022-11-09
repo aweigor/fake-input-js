@@ -32,6 +32,7 @@ class Text {
   }
 }
 
+
 function keyup ( state, dispatch ) {
   dispatch( {cursor: 0} );
 }
