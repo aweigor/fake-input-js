@@ -8,37 +8,63 @@ line-width -> lines detection
 */
 
 class Text {
-  constructor ( startValue = '', maxSize = Infinity ) {
-    this.maxSize = maxSize;
-    this.value = startValue.split('');
+  constructor ( startValue = '', lineSize = Infinity, data ) {
+    this.lineSize = lineSize;
+    this.data = data||startValue.split('\n').map( line => line.split('') );
   }
-  get length () {
-    return this.value.length;
+  get linesCount () {
+    return this.data.length;
   }
-  get () {
-    return this.value.join('');
+  get value () {
+    let copy = this.data.slice();
+    let lines = copy.map( line => line.join('') )
+    return lines.join('\n');
   }
-  put (index,value) {
-    let copy = this.value.slice();
-    let frontSlice = copy.slice(index,0);
-    let backSlice = copy.slice(0,index);
-    this.value = [...frontSlice,value,backSlice];
+  _lineAt ( index ) {
+    return this.data[index].join('');
   }
-  delete (index,amount=1) {
-    this.value = this.string.splice(index,amount);
+  _symbolAt ( line, index ) {
+    if (this.data[line])
+      return this.data[line][index];
+  }
+  put (line,index,value) {
+    let copy = this.data.slice();
+    if (copy[line]&&copy[line][index-1])
+      copy.splice(index,0,value);
+    return new Text(_,this.lineSize,copy);
+  }
+  break (line,index) {
+    let copy = this.data.slice(),first,second,newline = line;
+    if (copy[line]) {
+      first = copy[line].slice(0,index);
+      second = copy[line].slice(index,0);
+      copy[line] = first;
+      copy.splice(++newline,0,second);
+    }
+    return {text:new Text(_,this.lineSize,copy),line:newline};
+  }
+  remove (line,index,amount=1) {
+    let copy = this.data.slice();
+    if (copy[line]&&copy[index+amount])
+      copy[line].splice(index++,amount)
+    return {text:new Text(_,this.lineSize,copy),cursor:index};
   }
   static clear () {
-    return new Text('');
+    return new Text();
   }
 }
 
 
 function keyup ( state, dispatch ) {
-  dispatch( {cursor: 0} );
+  let line = state.line;
+  if (line > 0) line -= 1;
+  dispatch( {line} );
 }
 
 function keydown ( state, dispatch ) {
-  dispatch( {cursor: state.text.length - 1} )
+  let lines = state.text.lines,line = state.line;
+  if (state.line < lines) line += 1;
+  dispatch( {line} );
 }
 
 function keyleft ( state, dispatch ) {
@@ -53,19 +79,29 @@ function keyright ( state, dispatch ) {
   dispatch( {cursor} );
 }
 
-function keyenter ( state, dispatch ) {}
-
-function keybackspace ( state, dispatch ) {
-
+function keyenter ( state, dispatch ) {
+  let {text,line} = state.text.break(state.line, state.cursor);
+  dispatch( {text,line,cursor:0} );
 }
 
-function keyescape ( state, dispatch ) {}
+function keybackspace ( state, dispatch ) {
+  let {text,cursor} = state.text.remove(state.line, state.cursor);
+  dispatch( {text,cursor} );
+}
 
-function keyhome ( state, dispatch ) {}
+function keyescape ( state, dispatch ) {
+  dispatch( {focus: false} )
+}
 
-function keyend ( state, dispatch ) {}
+function keyhome ( state, dispatch ) {
+  dispatch( {cursor: 0, line:0} );
+}
 
-
+function keyend ( state, dispatch ) {
+  let endLine = state.text.linesCount - 1;
+  let endLen = state.text._lineAt( endLine ).length;
+  dispatch( {line:endLine,cursor:endLen&&--endLen} )
+}
 
 function handleControl ( input, state, dispatch ) {
   let controlName = getControlName(input.keyCode);
@@ -81,42 +117,32 @@ function handleSymbol ( input, state, dispatch ) {
     input.shiftKey, 
     state.locale
   );
-  dispatch( {text:state.text.push(symbol)} );
+  dispatch( {text:state.text.put(state.line,state.cursor,symbol)} );
 }
 
 
 const constrolActions = { keyup,keydown,keyleft,keyright,keyenter,keybackspace,keyescape,keyhome,keyend };
 const inputHandlers = { handleControl, handleSymbol }
 
-function updateState ( state, action ) {
-  return Object.assign( {}, state, action );
-}
-
 
 class InputReader {
-  constructor (state = {}, options = {}) 
+  constructor (startState, components) 
   {
-    const defaultOptions = {
-      locale: 'en',
-      keyboard_type: 'ancii'
-    }
-    const startState = {
+    const defaultState = {
       cursor: 0,
-      text: new Text('')
+      line: 0,
+      focus: false,
+      text: new Text(),
+      locale: 'en',
+      keyboard_type: 'ancii',
     }
 
-    this.options = Object.assign( {}, defaultOptions, options )
-    this.state = Object.assign( {}, startState, state );
+    this.state = Object.assign( {}, defaultState, startState );
 
     this.syncState = function (state) {
       this.state = state;
+      components.forEach( cmp => cmp.syncState(this.state) )
     }
-
-    function dispatch ( action ) {
-      let state = updateState( this.state, action );
-      this.syncState( state );
-    }
-    
 
     this.read = function ( input ) {
       if (input instanceof Array) {
@@ -132,7 +158,37 @@ class InputReader {
     }
 
     const scope = this;
+
+    function dispatch ( action ) {
+      let state = updateState( scope.state, action );
+      scope.syncState( state );
+    }
+
+    function updateState ( state, action ) {
+      return Object.assign( {}, state, action );
+    }
   }
 }
 
-export { InputReader };
+class TextArea {
+  constructor () {
+    this.element = document.createElement('div');
+  }
+  syncState (state) {
+    this.element.textContent = state.text.value;
+  }
+  static mount (provider,container,options) {
+    const input = new TextArea();
+    const reader = new InputReader(options,[input]);
+
+    provider.onValueChanged( event => {
+      reader.read(event.data);
+    } )
+
+    container.appendChild(input.element);
+
+    return {reader,input};
+  }
+}
+
+export { InputReader, TextArea };
