@@ -16,6 +16,8 @@ class Text {
     return this.data.length;
   }
   get value () {
+
+    console.log('get value', this.data)
     let copy = this.data.slice();
     let lines = copy.map( line => line.join('') )
     return lines.join('\n');
@@ -28,10 +30,17 @@ class Text {
       return this.data[line][index];
   }
   put (line,index,value) {
+    
+    //let copy = this.data.slice();
+    //if (copy[line]&&copy[line][index-1])
+    //  copy = copy.splice(index,0,value);
+    //copy.push(value);
+
+    //let copy = [['a','b','c']]
     let copy = this.data.slice();
-    if (copy[line]&&copy[line][index-1])
-      copy.splice(index,0,value);
-    return new Text(_,this.lineSize,copy);
+    copy[line].push(value)
+    console.log('put',line,index,value,copy)
+    return new Text('',this.lineSize,copy);
   }
   break (line,index) {
     let copy = this.data.slice(),first,second,newline = line;
@@ -117,7 +126,8 @@ function handleSymbol ( input, state, dispatch ) {
     input.shiftKey, 
     state.locale
   );
-  dispatch( {text:state.text.put(state.line,state.cursor,symbol)} );
+  console.log('handle', dispatch, state)
+  dispatch( {text:state.text.put(state.line,state.cursor,symbol),cursor:state.cursor+1} );
 }
 
 
@@ -140,11 +150,14 @@ class InputReader {
     this.state = Object.assign( {}, defaultState, startState );
 
     this.syncState = function (state) {
+      console.log('sync state', components)
       this.state = state;
       components.forEach( cmp => cmp.syncState(this.state) )
     }
 
     this.read = function ( input ) {
+
+      //console.log('read',input)
       if (input instanceof Array) {
         for (let event of input) {
           scope.read(event); }
@@ -153,19 +166,25 @@ class InputReader {
 
       try {
         let inputType = defineType(input.keyCode);
-        inputHandlers[`handle${inputType}`].call( scope.state, input, dispatch )
+        console.log('input type', scope.state)
+        inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]( input, scope.state, dispatch )
       } catch (e) {}
     }
 
     const scope = this;
 
     function dispatch ( action ) {
+      console.log('dispatch')
       let state = updateState( scope.state, action );
       scope.syncState( state );
     }
 
     function updateState ( state, action ) {
       return Object.assign( {}, state, action );
+    }
+
+    function capitalizeFirstLetter(string) {
+      return string.charAt(0).toUpperCase() + string.slice(1);
     }
   }
 }
@@ -175,15 +194,17 @@ class TextArea {
     this.element = document.createElement('div');
   }
   syncState (state) {
+    console.log('sync state', state.text)
     this.element.textContent = state.text.value;
   }
   static mount (provider,container,options) {
     const input = new TextArea();
     const reader = new InputReader(options,[input]);
-
+    /*
     provider.onValueChanged( event => {
       reader.read(event.data);
     } )
+    */
 
     container.appendChild(input.element);
 

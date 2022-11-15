@@ -47,15 +47,13 @@ class Buffer {
 }
 
 export default class BufferProvider extends BasicProvider {
-  constructor ( options ) {
+  constructor ( options, dispatch = () => {} ) {
     options = options||{};
     options.key = options.key||"buffer-provider";
 
     super( options );
 
-    this._buffer = new Buffer( options.buffer, function onChange (state, buffer) {
-      scope.handleBufferChange( state, buffer )
-    } )
+    this._buffer = new Buffer( options.buffer, dispatch)
 
     this.onKeyDown = function ( event ) {
       scope._buffer.syncState( event );

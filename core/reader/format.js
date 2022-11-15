@@ -1,6 +1,6 @@
-const ANCII_codemap = require("./keyboards/ancii/codemap.json");
-const ANCII_locales = require("./keyboards/ancii/locales.json");
-const ANCII_arrowsmap = require("./keyboards/ancii/arrowsmap.json")
+import ANCII_codemap from "./keyboards/ancii/codemap.json" assert {type: 'json'};
+import ANCII_locales from "./keyboards/ancii/locales.json" assert {type: 'json'};
+import ANCII_arrowsmap from "./keyboards/ancii/special.json" assert {type: 'json'};
 
 /**
  * 
