@@ -1,4 +1,4 @@
-import { getSymbol, defineType, getSpecialKey } from './format.js';
+import { getSymbol, defineType, getControlName } from './format.js';
 
 /*
 
@@ -16,10 +16,25 @@ class Text {
     return this.data.length;
   }
   get value () {
-
-    console.log('get value', this.data)
     let copy = this.data.slice();
     let lines = copy.map( line => line.join('') )
+    return lines.join('\n');
+  }
+  _all (line, index) {
+    let copy = this.data.slice(), lineCopy;
+    let lines = copy.map( (data,lineIndex) => {
+      lineCopy = data;
+      if (lineIndex === line) {
+        lineCopy = data.slice();
+        if (lineCopy[index]) {
+          lineCopy[index] = `_${copy[line][index]}_`;
+        } else {
+          lineCopy[index] = '_';
+        }
+      }
+      return lineCopy.join('');
+    } );
+
     return lines.join('\n');
   }
   _lineAt ( index ) {
@@ -30,17 +45,30 @@ class Text {
       return this.data[line][index];
   }
   put (line,index,value) {
-    
-    //let copy = this.data.slice();
-    //if (copy[line]&&copy[line][index-1])
-    //  copy = copy.splice(index,0,value);
-    //copy.push(value);
-
-    //let copy = [['a','b','c']]
     let copy = this.data.slice();
-    copy[line].push(value)
-    console.log('put',line,index,value,copy)
-    return new Text('',this.lineSize,copy);
+    let isChanged = false;
+
+    if (copy[line]&&copy[line].length) {
+      if (index > copy[line].length) {
+        for (let i = copy[line].length; i < index; i++) {
+          copy[line][i] = '';
+        }
+      }
+      copy[line].splice(index,0,value);
+      isChanged = true;
+    } else if (!copy[line]||!copy[line].length) {
+      if (line > copy.length) {
+        for (let i = copy.length; i < line; i++) {
+          copy[line] = [];
+        }
+      }
+      
+      copy[line] = Array(index);
+      copy[line][index] = value;
+      isChanged = true;
+    }
+    
+    return isChanged && new Text('',this.lineSize,copy);
   }
   break (line,index) {
     let copy = this.data.slice(),first,second,newline = line;
@@ -126,8 +154,8 @@ function handleSymbol ( input, state, dispatch ) {
     input.shiftKey, 
     state.locale
   );
-  console.log('handle', dispatch, state)
-  dispatch( {text:state.text.put(state.line,state.cursor,symbol),cursor:state.cursor+1} );
+  let text = state.text.put(state.line,state.cursor,symbol);
+  if (text) dispatch( {text,cursor:state.cursor+1} );
 }
 
 
@@ -150,31 +178,27 @@ class InputReader {
     this.state = Object.assign( {}, defaultState, startState );
 
     this.syncState = function (state) {
-      console.log('sync state', components)
       this.state = state;
       components.forEach( cmp => cmp.syncState(this.state) )
     }
 
-    this.read = function ( input ) {
+    this.listen = function ( input ) {
 
-      //console.log('read',input)
       if (input instanceof Array) {
         for (let event of input) {
-          scope.read(event); }
+          scope.listen(event); }
         return;
       }
 
       try {
         let inputType = defineType(input.keyCode);
-        console.log('input type', scope.state)
         inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]( input, scope.state, dispatch )
-      } catch (e) {}
+      } catch (e) { console.log(e) }
     }
 
     const scope = this;
 
     function dispatch ( action ) {
-      console.log('dispatch')
       let state = updateState( scope.state, action );
       scope.syncState( state );
     }
@@ -194,17 +218,11 @@ class TextArea {
     this.element = document.createElement('div');
   }
   syncState (state) {
-    console.log('sync state', state.text)
-    this.element.textContent = state.text.value;
+    this.element.textContent = state.text._all(state.line,state.cursor);
   }
-  static mount (provider,container,options) {
+  static mount (container,options) {
     const input = new TextArea();
     const reader = new InputReader(options,[input]);
-    /*
-    provider.onValueChanged( event => {
-      reader.read(event.data);
-    } )
-    */
 
     container.appendChild(input.element);
 

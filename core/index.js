@@ -168,7 +168,7 @@ export default class InputManager extends EventDispatcher {
         event.stopPropagation();
 
       _keyupEvent.originalEvent = event;
-      
+
       scope.dispatchEvent( _keyupEvent );
     }
     

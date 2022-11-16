@@ -16,7 +16,7 @@ import ANCII_arrowsmap from "./keyboards/ancii/special.json" assert {type: 'json
 const defineType = function ( code ) {
   if (!code||isNaN(code)) return;
   if (ANCII_codemap.includes(code)) return 'symbol';
-  if (Object.values(ANCII_arrowsmap).includes(code)) return 'special';
+  if (Object.values(ANCII_arrowsmap).includes(code)) return 'control';
 }
 
 
@@ -51,7 +51,7 @@ const getSymbol = function ( code = 65, altKey = false, shiftKey = false, locale
   return result;
 }
 
-const getSpecialKey = function ( code ) {
+const getControlName = function ( code ) {
   if (Object.keys(ANCII_arrowsmap).includes(code)) return ANCII_arrowsmap[code];
   return;
 }
@@ -62,4 +62,4 @@ for ( let code of codes ) {
   console.log ( getSymbol( code ) )
 }
 
-export { getSymbol, defineType, getSpecialKey }
+export { getSymbol, defineType, getControlName }

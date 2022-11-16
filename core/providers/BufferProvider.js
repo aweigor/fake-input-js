@@ -23,6 +23,7 @@ class Buffer {
     this.history = new Array(options.maxSize);
     
     this.syncState = function (state) {
+      
       Object.keys( scope.state ).forEach( k => {
         if (state[k] !== undefined) this.state[k] = state[k];
       } );
@@ -60,7 +61,7 @@ export default class BufferProvider extends BasicProvider {
     }
   
     this.onKeyUp = function ( event ) {
-      scope._buffer.syncState( event );
+      //scope._buffer.syncState( event );
     }
 
     this.getRecordsByInterval = function ( timeStart, timeFinish ) {

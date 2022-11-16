@@ -11,7 +11,7 @@ export default class BasicProvider {
       if ( event.type === 'keyup' ) {
         scope.onKeyUp( event.originalEvent );
       }
-      if ( event.type = 'keydown' ) {
+      if ( event.type === 'keydown' ) {
         scope.onKeyDown( event.originalEvent );
       }
     }
