@@ -6,7 +6,8 @@ const stateTemplate = {
   ctrlKey: Boolean,
   metaKey: Boolean,
   shiftKey: Boolean,
-  keyCode: Number
+  keyCode: Number,
+  selection: Object
 }
 
 class Buffer {
@@ -23,7 +24,6 @@ class Buffer {
     this.history = new Array(options.maxSize);
     
     this.syncState = function (state) {
-      
       Object.keys( scope.state ).forEach( k => {
         if (state[k] !== undefined) this.state[k] = state[k];
       } );
@@ -43,7 +43,7 @@ class Buffer {
       }
     }
 
-    Object.seal(this.state)
+    Object.seal(this.state);
   }
 }
 

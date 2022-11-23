@@ -1,10 +1,8 @@
 import { getSymbol, defineType, getControlName } from './format.js';
 
 /*
-
 possible features:
 line-width -> lines detection
-
 */
 
 class Text {
@@ -68,7 +66,7 @@ class Text {
       isChanged = true;
     }
     
-    return isChanged && new Text('',this.lineSize,copy);
+    return isChanged ? new Text('',this.lineSize,copy) : this;
   }
   break (line,index) {
     let copy = this.data.slice(),first,second,newline = line;
@@ -163,8 +161,8 @@ const constrolActions = { keyup,keydown,keyleft,keyright,keyenter,keybackspace,k
 const inputHandlers = { handleControl, handleSymbol }
 
 
-class InputReader {
-  constructor (startState, components) 
+class InputTranslator {
+  constructor (startState) 
   {
     const defaultState = {
       cursor: 0,
@@ -175,11 +173,13 @@ class InputReader {
       keyboard_type: 'ancii',
     }
 
+    this.anchors = [];
+
     this.state = Object.assign( {}, defaultState, startState );
 
     this.syncState = function (state) {
-      this.state = state;
-      components.forEach( cmp => cmp.syncState(this.state) )
+      scope.state = state;
+      scope.anchors.forEach( cmp => cmp.syncState(this.state) )
     }
 
     this.listen = function ( input ) {
@@ -194,6 +194,10 @@ class InputReader {
         let inputType = defineType(input.keyCode);
         inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]( input, scope.state, dispatch )
       } catch (e) { console.log(e) }
+    }
+
+    this.use = function ( anchorElement ) {
+      scope.anchors.push(anchorElement)
     }
 
     const scope = this;
@@ -213,21 +217,27 @@ class InputReader {
   }
 }
 
-class TextArea {
-  constructor () {
+class Anchor {
+  constructor ({name}) {
+    this.name = name;
     this.element = document.createElement('div');
   }
   syncState (state) {
     this.element.textContent = state.text._all(state.line,state.cursor);
   }
-  static mount (container,options) {
-    const input = new TextArea();
-    const reader = new InputReader(options,[input]);
-
-    container.appendChild(input.element);
-
-    return {reader,input};
+  mount (container) {
+    if (container instanceof HTMLElement) 
+      return container.appendChild(this.input._el);
+    if (typeof(container) == 'string')
+      if (container = container.replace('#','')) {
+        container = document.getElementById( container );
+        if (container) return container.appendChild(this.element);
+      }
   }
 }
 
-export { InputReader, TextArea };
+function createAnchorElement ( options = {} ) {
+  return new Anchor(options);
+}
+
+export { InputTranslator, createAnchorElement };

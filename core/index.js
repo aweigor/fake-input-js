@@ -95,8 +95,8 @@ export default class InputManager extends EventDispatcher {
 
     this.element = element||document;
     this.settings = {
-      preventDefault: options.preventDefault||true,
-      stopPropagation: options.stopPropagation||true,
+      preventDefault: options.preventDefault||false,
+      stopPropagation: options.stopPropagation||false,
     }
 
     this.dispose = function () {
