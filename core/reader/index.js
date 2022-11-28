@@ -67,8 +67,6 @@ class Text {
     return isChanged ? new Text('',this.lineSize,copy) : this;
   }
   break (line,index) {
-    console.log('break', line, index);
-
     let copy = this.data.slice(),first,second,newline = line;
     if (copy[line]) {
       first = copy[line].slice(0,index);
