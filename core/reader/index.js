@@ -57,9 +57,7 @@ class Text {
     } else if (!copy[line]||!copy[line].length) {
       if (line > copy.length) {
         for (let i = copy.length; i < line; i++) {
-          copy[line] = [];
-        }
-      }
+          copy[line] = []; } };
       
       copy[line] = Array(index);
       copy[line][index] = value;
@@ -69,6 +67,8 @@ class Text {
     return isChanged ? new Text('',this.lineSize,copy) : this;
   }
   break (line,index) {
+    console.log('break', line, index);
+
     let copy = this.data.slice(),first,second,newline = line;
     if (copy[line]) {
       first = copy[line].slice(0,index);
@@ -81,14 +81,13 @@ class Text {
   remove (line,index,amount=1) {
     let copy = this.data.slice();
     if (copy[line]&&copy[index+amount])
-      copy[line].splice(index++,amount)
+      copy[line].splice(index++,amount);
     return {text:new Text(_,this.lineSize,copy),cursor:index};
   }
   static clear () {
     return new Text();
   }
 }
-
 
 function keyup ( state, dispatch ) {
   let line = state.line;
@@ -115,7 +114,8 @@ function keyright ( state, dispatch ) {
 }
 
 function keyenter ( state, dispatch ) {
-  let {text,line} = state.text.break(state.line, state.cursor);
+  console.log( 'key enter', state )
+  let { text,line } = state.text.break(state.selection.line, state.selection.caret);
   dispatch( {text,line,cursor:0} );
 }
 
@@ -140,6 +140,7 @@ function keyend ( state, dispatch ) {
 
 function handleControl ( input, state, dispatch ) {
   let controlName = getControlName(input.keyCode);
+  console.log('get control name', controlName)
   try {
     constrolActions[`key${controlName}`]( state, dispatch );
   } catch (e) {}
@@ -152,7 +153,7 @@ function handleSymbol ( input, state, dispatch ) {
     input.shiftKey, 
     state.locale
   );
-  let text = state.text.put(state.line,state.cursor,symbol);
+  let text = state.text.put(state.selection.line,state.selection.caret,symbol);
   if (text) dispatch( {text,cursor:state.cursor+1} );
 }
 
@@ -162,13 +163,14 @@ const inputHandlers = { handleControl, handleSymbol }
 
 
 class InputTranslator {
-  constructor (startState) 
+  constructor ( provider, startState ) 
   {
     const defaultState = {
       cursor: 0,
       line: 0,
       focus: false,
       text: new Text(),
+      selection: {},
       locale: 'en',
       keyboard_type: 'ancii',
     }
@@ -179,21 +181,7 @@ class InputTranslator {
 
     this.syncState = function (state) {
       scope.state = state;
-      scope.anchors.forEach( cmp => cmp.syncState(this.state) )
-    }
-
-    this.listen = function ( input ) {
-
-      if (input instanceof Array) {
-        for (let event of input) {
-          scope.listen(event); }
-        return;
-      }
-
-      try {
-        let inputType = defineType(input.keyCode);
-        inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]( input, scope.state, dispatch )
-      } catch (e) { console.log(e) }
+      scope.anchors.forEach( cmp => cmp.syncState(this.state) );
     }
 
     this.use = function ( anchorElement ) {
@@ -201,6 +189,7 @@ class InputTranslator {
     }
 
     const scope = this;
+    provider.addEventListener( 'keydown', listen );
 
     function dispatch ( action ) {
       let state = updateState( scope.state, action );
@@ -212,7 +201,21 @@ class InputTranslator {
     }
 
     function capitalizeFirstLetter(string) {
+      console.log('capitalizing', string);
       return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+
+    function listen ( input ) {
+      if (input instanceof Array)
+        return input.forEach( event => scope.listen(event) );
+
+      scope.state.selection = input.selection;
+      const inputType = defineType(input.keyCode);
+
+      try {
+        inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]( 
+          input, scope.state, dispatch )
+      } catch (e) { console.log(e) }
     }
   }
 }

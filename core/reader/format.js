@@ -16,7 +16,7 @@ import ANCII_arrowsmap from "./keyboards/ancii/special.json" assert {type: 'json
 const defineType = function ( code ) {
   if (!code||isNaN(code)) return;
   if (ANCII_codemap.includes(code)) return 'symbol';
-  if (Object.values(ANCII_arrowsmap).includes(code)) return 'control';
+  if (Object.keys(ANCII_arrowsmap).includes(code.toString())) return 'control';
 }
 
 
@@ -52,7 +52,7 @@ const getSymbol = function ( code = 65, altKey = false, shiftKey = false, locale
 }
 
 const getControlName = function ( code ) {
-  if (Object.keys(ANCII_arrowsmap).includes(code)) return ANCII_arrowsmap[code];
+  if (Object.keys(ANCII_arrowsmap).includes(code.toString())) return ANCII_arrowsmap[code];
   return;
 }
 
