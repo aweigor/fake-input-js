@@ -5,6 +5,17 @@ possible features:
 line-width -> lines detection
 */
 
+class Selection {
+
+  constructor () {
+
+  }
+  syncState () {
+    return new Selection();
+  }
+
+}
+
 class Text {
   constructor ( startValue = '', lineSize = Infinity, data ) {
     this.lineSize = lineSize;
@@ -42,10 +53,22 @@ class Text {
     if (this.data[line])
       return this.data[line][index];
   }
-  put (line,index,value) {
-    let copy = this.data.slice();
-    let isChanged = false;
+  put (selection,value) {
 
+    let copy = JSON.parse(JSON.stringify(this.data));
+    let line = selection.line;
+    let caret = selection.caret;
+    let selected = selected.selected - selected.caret;
+
+
+    if (this.data[line]&&this.data[line].lenght) 
+    //let isChanged = false;
+
+
+    console.log('put',selection, value );
+
+
+    /*
     if (copy[line]&&copy[line].length) {
       if (index > copy[line].length) {
         for (let i = copy[line].length; i < index; i++) {
@@ -63,6 +86,7 @@ class Text {
       copy[line][index] = value;
       isChanged = true;
     }
+    */
     
     return isChanged ? new Text('',this.lineSize,copy) : this;
   }
@@ -136,23 +160,27 @@ function keyend ( state, dispatch ) {
   dispatch( {line:endLine,cursor:endLen&&--endLen} )
 }
 
-function handleControl ( input, state, dispatch ) {
-  let controlName = getControlName(input.keyCode);
-  console.log('get control name', controlName)
-  try {
-    constrolActions[`key${controlName}`]( state, dispatch );
-  } catch (e) {}
+function handleControl ( {event,history}, dispatch ) {
+  let controlName = getControlName(event.keyCode);
+  try { constrolActions[`key${controlName}`]( this, dispatch ); } 
+  catch (e) {}
 }
 
-function handleSymbol ( input, state, dispatch ) {
+function handleSymbol ( {event,history}, dispatch ) {
   let symbol = getSymbol(
-    input.keyCode, 
-    input.altKey, 
-    input.shiftKey, 
-    state.locale
+    event.keyCode, 
+    event.altKey, 
+    event.shiftKey, 
+    event.locale
   );
-  let text = state.text.put(state.selection.line,state.selection.caret,symbol);
-  if (text) dispatch( {text,cursor:state.cursor+1} );
+
+  let text = this.text.put(event.selection,symbol);
+  if (text) dispatch( {text,cursor:event.selection.caret} );
+}
+
+function handleSelection ( {event,history}, dispatch ) {
+  let selection = this.selection.syncState( event );
+  dispatch( {selection} );
 }
 
 
@@ -168,7 +196,7 @@ class InputTranslator {
       line: 0,
       focus: false,
       text: new Text(),
-      selection: {},
+      selection: new Selection(),
       locale: 'en',
       keyboard_type: 'ancii',
     }
@@ -188,6 +216,7 @@ class InputTranslator {
 
     const scope = this;
     provider.addEventListener( 'keydown', listen );
+    provider.addEventListener( 'selection', selection );
 
     function dispatch ( action ) {
       let state = updateState( scope.state, action );
@@ -199,21 +228,19 @@ class InputTranslator {
     }
 
     function capitalizeFirstLetter(string) {
-      console.log('capitalizing', string);
       return string.charAt(0).toUpperCase() + string.slice(1);
     }
 
-    function listen ( input ) {
-      if (input instanceof Array)
-        return input.forEach( event => scope.listen(event) );
+    function listen ( {event,history} ) {
+      const inputType = defineType(event.keyCode);
 
-      scope.state.selection = input.selection;
-      const inputType = defineType(input.keyCode);
+      try { inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]
+            .call( scope.state, {event, history}, dispatch ) } 
+      catch (e) { console.log(e) }
+    }
 
-      try {
-        inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]( 
-          input, scope.state, dispatch )
-      } catch (e) { console.log(e) }
+    function selection ( {event,history} ) {
+      handleSelection.call( scope.state, {event,history}, dispatch)
     }
   }
 }

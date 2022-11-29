@@ -32,9 +32,9 @@ export default class HtmlProvider extends BufferProvider {
   constructor ( options = {} ) {
     options.key = options.key||"html-provider";
 
-    super( options );
+    super( options, dispatch );
 
-    this.input = new Input();
+    this.input = new Input( );
 
     const eventListeners = {};
     const selection = window.getSelection();
@@ -56,42 +56,6 @@ export default class HtmlProvider extends BufferProvider {
       if (delID !== -1) eventListeners[type].splice(delID, 1);
     }
 
-    this.onKeyDown = function ( event ) 
-    {
-      if (!isDescendant(scope.input._el, selection.focusNode)) return;
-
-      function isDescendant (parent, child) {
-        let node = child;
-
-        while( node ) {
-          if (node == parent) return true;
-          node = node.parentNode;
-        }
-
-        return false;
-      }
-
-      function getCurrentLine () {
-        let index =  scope.input.indexOf( selection.focusNode.parentElement ) !== -1 
-          ? scope.input.indexOf( selection.focusNode.parentElement ) 
-          : scope.input.indexOf( selection.focusNode );
-        return index + 1;
-      }
-
-      event.selection = {
-        caret: selection.focusOffset,
-        selected: selection.anchorOffset,
-        line: getCurrentLine(),
-        text: scope.input._el.innerText
-      }
-
-      scope._buffer.syncState( event );
-      eventListeners['keydown'].forEach( h => h.call( scope, event ) );
-    }
-  
-    this.onKeyUp = function ( event ) {
-    }
-
     this.mountInput = function (container) {
       if (container instanceof HTMLElement) 
         return container.appendChild(this.input._el);
@@ -103,5 +67,44 @@ export default class HtmlProvider extends BufferProvider {
     }
 
     const scope = this;
+
+    function getLine (input,selection) {
+      let index = input.indexOf( selection.focusNode.parentElement ) !== -1 
+        ? input.indexOf( selection.focusNode.parentElement ) 
+        : input.indexOf( selection.focusNode );
+      return index + 1;
+    }
+
+    function isDescendant (parent, child) {
+      let node = child;
+
+      while( node ) {
+        if (node == parent) return true;
+        node = node.parentNode;
+      }
+
+      return false;
+    }
+
+    function dispatch ( event,buffer ) {
+      const history = buffer.filter( e => e.type == event.type );
+      eventListeners[event.type].forEach( h => h.call( scope, {event,history} ) );
+    }
+
+    function handleSelectionChange () {
+      if (!isDescendant(scope.input._el, selection.focusNode)) return;
+
+      const event = {
+        type: 'selection',
+        caret: selection.focusOffset,
+        selected: selection.anchorOffset,
+        line: getLine(scope.input, selection),
+        text: scope.input._el.innerText
+      }
+
+      scope._buffer.syncState( event );
+    }
+
+    document.addEventListener( 'selectionchange', handleSelectionChange )
   }
 }
