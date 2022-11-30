@@ -1,17 +1,17 @@
 import { getSymbol, defineType, getControlName } from './format.js';
 
-/*
-possible features:
-line-width -> lines detection
-*/
-
 class Selection {
 
-  constructor () {
-
-  }
-  syncState () {
-    return new Selection();
+  constructor ( state = {
+    caret: 0,
+    selected: 0,
+    line: 0,
+    lines: 0,
+    focus: false
+  } ) { Object.assign(this, state); }
+  
+  syncState ( data ) {
+    return new Selection( data );
   }
 
 }
@@ -54,6 +54,9 @@ class Text {
       return this.data[line][index];
   }
   put (selection,value) {
+
+    //console.log('put', this, selection, value );
+    return
 
     let copy = JSON.parse(JSON.stringify(this.data));
     let line = selection.line;
@@ -174,12 +177,12 @@ function handleSymbol ( {event,history}, dispatch ) {
     event.locale
   );
 
-  let text = this.text.put(event.selection,symbol);
+  let text = this.text.put(this.selection,symbol);
   if (text) dispatch( {text,cursor:event.selection.caret} );
 }
 
 function handleSelection ( {event,history}, dispatch ) {
-  let selection = this.selection.syncState( event );
+  let selection = this.selection.syncState( event.selection );
   dispatch( {selection} );
 }
 
@@ -192,8 +195,6 @@ class InputTranslator {
   constructor ( provider, startState ) 
   {
     const defaultState = {
-      cursor: 0,
-      line: 0,
       focus: false,
       text: new Text(),
       selection: new Selection(),
@@ -240,7 +241,7 @@ class InputTranslator {
     }
 
     function selection ( {event,history} ) {
-      handleSelection.call( scope.state, {event,history}, dispatch)
+      handleSelection.call( scope.state, {event,history}, dispatch )
     }
   }
 }

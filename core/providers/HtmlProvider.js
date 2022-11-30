@@ -13,7 +13,7 @@ class Input {
     this._el.addEventListener( 'input', (_) => {} )
 
     this.indexOf = function( elt ) {
-      const children = Array.from(scope._el.children);
+      const children = Array.from( scope._el.children );
       return children.indexOf( elt );
     }
 
@@ -34,7 +34,7 @@ export default class HtmlProvider extends BufferProvider {
 
     super( options, dispatch );
 
-    this.input = new Input( );
+    this.input = new Input();
 
     const eventListeners = {};
     const selection = window.getSelection();
@@ -59,11 +59,12 @@ export default class HtmlProvider extends BufferProvider {
     this.mountInput = function (container) {
       if (container instanceof HTMLElement) 
         return container.appendChild(this.input._el);
-      if (typeof(container) == 'string')
+      if (typeof(container) == 'string') {
         if (container = container.replace('#','')) {
           container = document.getElementById( container );
           if (container) return container.appendChild(this.input._el);
         }
+      }
     }
 
     const scope = this;
@@ -88,18 +89,26 @@ export default class HtmlProvider extends BufferProvider {
 
     function dispatch ( event,buffer ) {
       const history = buffer.filter( e => e.type == event.type );
+      if (!eventListeners[event.type]) return;
       eventListeners[event.type].forEach( h => h.call( scope, {event,history} ) );
     }
 
     function handleSelectionChange () {
-      if (!isDescendant(scope.input._el, selection.focusNode)) return;
 
-      const event = {
-        type: 'selection',
+      const event = { type:'selection' };
+
+      if (!isDescendant(scope.input._el, selection.focusNode)) {
+        return scope._buffer.syncState( 
+          Object.assign({},event,{selection:{focus:false}}) )
+      };
+
+      event.selection = {
         caret: selection.focusOffset,
         selected: selection.anchorOffset,
         line: getLine(scope.input, selection),
-        text: scope.input._el.innerText
+        lines: scope.input._el.innerText.split('\n').length,
+        text: scope.input._el.innerText,
+        focus: true
       }
 
       scope._buffer.syncState( event );

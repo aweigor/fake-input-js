@@ -1,13 +1,48 @@
 import BasicProvider from './BasicProvider.js';
 
-const stateTemplate = {
-  type: String,
-  altKey: Boolean,
-  ctrlKey: Boolean,
-  metaKey: Boolean,
-  shiftKey: Boolean,
-  keyCode: Number,
-  selection: Object
+class BufferState {
+  constructor ( state ) {
+    this.value = state;
+  }
+
+  static init () {
+    const Interface = {
+      type: String(),
+      altKey: Boolean(),
+      ctrlKey: Boolean(),
+      metaKey: Boolean(),
+      shiftKey: Boolean(),
+      keyCode: Number(),
+      timestamp: Number(),
+      selection: {
+        caret: Number(),
+        selected: Number(),
+        line: Number(),
+        lines: Number(),
+        text: String(),
+        focus: Boolean()
+      }
+    }
+    Object.seal( Interface );
+    return new BufferState(Interface);
+  }
+
+  update ( newState ) {
+    function mergeState ( target, source ) {
+      for (let key of Object.keys(target)) {
+        if ( source[key] !== undefined && typeof (source[key]) == typeof(target[key]) ) {
+          if ( target[key] instanceof Object ) {
+            mergeState( target[key], source[key] );
+          } else {
+            target[key] = source[key];
+          }
+        }
+      }
+      return target
+    }
+
+    return new BufferState( mergeState( this.value, newState ) );
+  }
 }
 
 class Buffer {
@@ -16,21 +51,17 @@ class Buffer {
     options.maxSize = options.maxSize||10;
     options.onChange = options.onChange||function(){};
 
-    const startState = options.customState||stateTemplate;
-
     this.options = options;
-    this.state = Object.assign( Object.create(null), startState );
+    this.state = BufferState.init();
     this.state.timestamp = Date.now();
     this.history = new Array(options.maxSize);
     
     this.syncState = function (state) {
-      Object.keys( scope.state ).forEach( k => {
-        if (state[k] !== undefined) this.state[k] = state[k];
-      } );
-      scope.state.timestamp = Date.now();
+      scope.state = scope.state.update(state);
+      scope.state.value.timestamp = Date.now();
       const {history} = pushHistory( scope.state );
       options.onChange(scope.state,history);
-      callback(scope.state,history);
+      callback(scope.state.value,history);
     }
   
     const scope = this;
