@@ -99,7 +99,7 @@ export default class HtmlProvider extends BufferProvider {
 
       if (!isDescendant(scope.input._el, selection.focusNode)) {
         return scope._buffer.syncState( 
-          Object.assign({},event,{selection:{focus:false}}) )
+          Object.assign( {},event,{selection:{ focus:false }} ) )
       };
 
       event.selection = {

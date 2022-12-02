@@ -1,5 +1,37 @@
 import { getSymbol, defineType, getControlName } from './format.js';
 
+class Range {
+  constructor (index=0) {
+    this._index = index;
+    this.start = 0;
+    this.end = 0;
+    this._selected = {
+      start: 0,
+      end: 0
+    }
+  }
+
+  get length () {
+    return Math.abs(this.end = this.start);
+  }
+
+  get index () {
+    return this._index;
+  } 
+  set index (value) {
+    this._index = value;
+  }
+
+  get selected () {
+    return Object.assign({},this._selected,{length: Math.abs(this._selected.end - this._selected.start)})
+  }
+
+  set selected (selection) {
+    this._selected.start = selection.start||0;
+    this._selected.end = selection.end||0;
+  }
+}
+
 class Selection {
 
   constructor ( state = {
@@ -7,19 +39,55 @@ class Selection {
     selected: 0,
     line: 0,
     lines: 0,
+    ranges: [],
     focus: false
   } ) { Object.assign(this, state); }
   
   syncState ( data ) {
+    data.ranges = this.setRanges( data );
     return new Selection( data );
+  }
+
+  setRanges ( state ) {
+    
+    let ranges = this.ranges.slice(), range;
+    if (ranges.length < state.lines) {
+      for ( let i = ranges.length; i < state.lines; i++ ) {
+        ranges.push( new Range(i) );
+      }
+    }
+    
+    range = ranges.find( r => r.index == state.line );
+    
+    if (!range) return ranges;
+    if (state.caret > range.end) {
+      range.end = state.caret; }
+
+    range.selected = {
+      start:state.caret,
+      end:state.selected
+    }
+
+    return ranges;
   }
 
 }
 
+class Line {
+
+  constructor ( data = [], range = new Range() ) {
+    this._buffer = Array(range.length);
+    this._range = range;
+  }
+
+  syncState( scope ) {
+    
+  }
+}
+
 class Text {
-  constructor ( startValue = '', lineSize = Infinity, data ) {
-    this.lineSize = lineSize;
-    this.data = data||startValue.split('\n').map( line => line.split('') );
+  constructor ( selection = new Selection(), data = [] ) {
+    Object.assign(this, { selection,data });
   }
   get linesCount () {
     return this.data.length;
@@ -53,12 +121,23 @@ class Text {
     if (this.data[line])
       return this.data[line][index];
   }
+  applySelection ( selection ) {
+    let selection = this.selection.syncState( selection );
+    let data = selection.ranges.map( (range,index) => 
+      Array.prototype.push.apply( Array(range.length).fill(''), this.data[index] ) );
+
+    return new Text( selection, data );
+  }
   put (selection,value) {
 
-    //console.log('put', this, selection, value );
+    console.log('put', this, selection, value );
+    let data = JSON.parse(JSON.stringify(this.data));
+    if (this.data[line]&&this.data[line].lenght) {
+      
+    }
+
     return
 
-    let copy = JSON.parse(JSON.stringify(this.data));
     let line = selection.line;
     let caret = selection.caret;
     let selected = selected.selected - selected.caret;
@@ -182,8 +261,9 @@ function handleSymbol ( {event,history}, dispatch ) {
 }
 
 function handleSelection ( {event,history}, dispatch ) {
-  let selection = this.selection.syncState( event.selection );
-  dispatch( {selection} );
+  //let selection = this.selection.syncState( event.selection );
+  let text = this.applySelection( event.selection );
+  dispatch( {text} );
 }
 
 
@@ -197,7 +277,6 @@ class InputTranslator {
     const defaultState = {
       focus: false,
       text: new Text(),
-      selection: new Selection(),
       locale: 'en',
       keyboard_type: 'ancii',
     }
