@@ -1,5 +1,24 @@
 import { getSymbol, defineType, getControlName } from './format.js';
 
+class Matrix {
+  constructor( width = 0, height = 0, element = (x,y) => -1 ) {
+    this.width = width;
+    this.height = height;
+    this.content = [];
+
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++)
+        this.content[ y * width + x ] = element(x, y)
+  }
+
+  get (x, y) {
+    return this.content[y * this.width + x];
+  }
+  set (x, y, value) {
+    this.content[y * this.width + x] = value;
+  }
+}
+
 class Range {
   constructor (index=0) {
     this._index = index;
@@ -11,8 +30,8 @@ class Range {
     }
   }
 
-  get length () {
-    return Math.abs(this.end = this.start);
+  get size () {
+    return Math.abs(this.end - this.start);
   }
 
   get index () {
@@ -23,7 +42,7 @@ class Range {
   }
 
   get selected () {
-    return Object.assign({},this._selected,{length: Math.abs(this._selected.end - this._selected.start)})
+    return Object.assign({},this._selected,{size: Math.abs(this._selected.end - this._selected.start)})
   }
 
   set selected (selection) {
@@ -43,51 +62,42 @@ class Selection {
     focus: false
   } ) { Object.assign(this, state); }
   
-  syncState ( data ) {
-    data.ranges = this.setRanges( data );
-    return new Selection( data );
+  syncState ( state ) {
+    const { ranges, maxRange } = this.setRanges( state );
+
+    const newState = Object.assign( {}, state, { maxRange, ranges } );
+    return new Selection( newState );
   }
 
   setRanges ( state ) {
-    
-    let ranges = this.ranges.slice(), range;
-    if (ranges.length < state.lines) {
-      for ( let i = ranges.length; i < state.lines; i++ ) {
-        ranges.push( new Range(i) );
+    let ranges = [], range, maxRange;
+
+    for ( let i = 0; i < state.lines; i++ ) {
+      
+      range = this.ranges[i] || new Range(i);
+
+      if (range.index == state.line) {
+        range.selected = {
+          start:state.caret,
+          end:state.selected
+        }
+        if (state.caret > range.end) {
+          range.end = state.caret; 
+        } 
       }
+      
+      ranges[i] = range;
     }
-    
-    range = ranges.find( r => r.index == state.line );
-    
-    if (!range) return ranges;
-    if (state.caret > range.end) {
-      range.end = state.caret; }
+    maxRange = Math.max( ...ranges.map( item => item.size ) );
 
-    range.selected = {
-      start:state.caret,
-      end:state.selected
-    }
-
-    return ranges;
-  }
-
-}
-
-class Line {
-
-  constructor ( data = [], range = new Range() ) {
-    this._buffer = Array(range.length);
-    this._range = range;
-  }
-
-  syncState( scope ) {
-    
+    return { ranges, maxRange };
   }
 }
 
 class Text {
-  constructor ( selection = new Selection(), data = [] ) {
-    Object.assign(this, { selection,data });
+  constructor ( data = new Matrix(), selection = new Selection() ) {
+    this.selection = selection;
+    this.data = data;
   }
   get linesCount () {
     return this.data.length;
@@ -97,7 +107,20 @@ class Text {
     let lines = copy.map( line => line.join('') )
     return lines.join('\n');
   }
+
+  syncState (action) {
+    if (!action.selection) return;
+
+    const selection = this.selection.syncState( action.selection );
+
+    const element = (x,y) => this.data.get(x,y) || -1;
+    const data = new Matrix(selection.lines, selection.maxRange, element);
+
+    return new Text ( data, selection );
+  }
+
   _all (line, index) {
+    return '';
     let copy = this.data.slice(), lineCopy;
     let lines = copy.map( (data,lineIndex) => {
       lineCopy = data;
@@ -121,56 +144,9 @@ class Text {
     if (this.data[line])
       return this.data[line][index];
   }
-  applySelection ( selection ) {
-    let selection = this.selection.syncState( selection );
-    let data = selection.ranges.map( (range,index) => 
-      Array.prototype.push.apply( Array(range.length).fill(''), this.data[index] ) );
-
-    return new Text( selection, data );
-  }
-  put (selection,value) {
-
-    console.log('put', this, selection, value );
-    let data = JSON.parse(JSON.stringify(this.data));
-    if (this.data[line]&&this.data[line].lenght) {
-      
-    }
-
-    return
-
-    let line = selection.line;
-    let caret = selection.caret;
-    let selected = selected.selected - selected.caret;
-
-
-    if (this.data[line]&&this.data[line].lenght) 
-    //let isChanged = false;
-
-
-    console.log('put',selection, value );
-
-
-    /*
-    if (copy[line]&&copy[line].length) {
-      if (index > copy[line].length) {
-        for (let i = copy[line].length; i < index; i++) {
-          copy[line][i] = '';
-        }
-      }
-      copy[line].splice(index,0,value);
-      isChanged = true;
-    } else if (!copy[line]||!copy[line].length) {
-      if (line > copy.length) {
-        for (let i = copy.length; i < line; i++) {
-          copy[line] = []; } };
-      
-      copy[line] = Array(index);
-      copy[line][index] = value;
-      isChanged = true;
-    }
-    */
-    
-    return isChanged ? new Text('',this.lineSize,copy) : this;
+  put (value) {
+    this.data.set( this.selection.caret, this.selection.line, value )
+    return this;
   }
   break (line,index) {
     let copy = this.data.slice(),first,second,newline = line;
@@ -249,21 +225,14 @@ function handleControl ( {event,history}, dispatch ) {
 }
 
 function handleSymbol ( {event,history}, dispatch ) {
-  let symbol = getSymbol(
-    event.keyCode, 
-    event.altKey, 
-    event.shiftKey, 
-    event.locale
-  );
-
-  let text = this.text.put(this.selection,symbol);
+  let code = parseInt( `${event.keyCode}${event.altKey?1:0}${event.shiftKey?1:0}` );
+  let text = this.text.put( code );
   if (text) dispatch( {text,cursor:event.selection.caret} );
 }
 
 function handleSelection ( {event,history}, dispatch ) {
-  //let selection = this.selection.syncState( event.selection );
-  let text = this.applySelection( event.selection );
-  dispatch( {text} );
+  let text = this.text.syncState( {selection:event.selection} );
+  dispatch( { text } );
 }
 
 
@@ -291,7 +260,7 @@ class InputTranslator {
     }
 
     this.use = function ( anchorElement ) {
-      scope.anchors.push(anchorElement)
+      scope.anchors.push(anchorElement);
     }
 
     const scope = this;
@@ -315,12 +284,12 @@ class InputTranslator {
       const inputType = defineType(event.keyCode);
 
       try { inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]
-            .call( scope.state, {event, history}, dispatch ) } 
+        .call( scope.state, {event, history}, dispatch ) } 
       catch (e) { console.log(e) }
     }
 
     function selection ( {event,history} ) {
-      handleSelection.call( scope.state, {event,history}, dispatch )
+      handleSelection.call( scope.state, {event,history}, dispatch );
     }
   }
 }
@@ -334,12 +303,12 @@ class Anchor {
     this.element.textContent = state.text._all(state.line,state.cursor);
   }
   mount (container) {
-    if (container instanceof HTMLElement) 
-      return container.appendChild(this.input._el);
-    if (typeof(container) == 'string')
-      if (container = container.replace('#','')) {
+    if ( container instanceof HTMLElement )
+      return container.appendChild( this.input._el );
+    if ( typeof(container) == 'string' );
+      if ( container = container.replace('#','') ) {
         container = document.getElementById( container );
-        if (container) return container.appendChild(this.element);
+        if (container) return container.appendChild( this.element );
       }
   }
 }

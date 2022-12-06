@@ -10,7 +10,7 @@ class Input {
 
     this._el.setAttribute('contenteditable', true );
     this._el.setAttribute('tabIndex', 0 );
-    this._el.addEventListener( 'input', (_) => {} )
+    this._el.addEventListener( 'input', (_) => {} );
 
     this.indexOf = function( elt ) {
       const children = Array.from( scope._el.children );
@@ -40,8 +40,8 @@ export default class HtmlProvider extends BufferProvider {
     const selection = window.getSelection();
     const range = document.createRange();
 
-    range.setStart(this.input._el, 0);
-    range.setEnd(this.input._el, 0);
+    range.setStart( this.input._el, 0 );
+    range.setEnd( this.input._el, 0 );
     selection.addRange(range);
 
     this.addEventListener = function ( type, handler ) {
