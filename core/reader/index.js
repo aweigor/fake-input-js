@@ -17,6 +17,12 @@ class Matrix {
   set (x, y, value) {
     this.content[y * this.width + x] = value;
   }
+  getString (y) {
+    return this.content.slice( y * this.width, y * this.width + this.width );
+  }
+  as2DArray () {
+    return Array.from( new Array(this.height), ( v,i ) => this.getString(i) )
+  }
 }
 
 class Range {
@@ -59,14 +65,16 @@ class Selection {
     line: 0,
     lines: 0,
     ranges: [],
+    maxRange: 0,
     focus: false
   } ) { Object.assign(this, state); }
   
   syncState ( state ) {
     const { ranges, maxRange } = this.setRanges( state );
-
     const newState = Object.assign( {}, state, { maxRange, ranges } );
-    return new Selection( newState );
+    const extended = newState.lines > this.lines || newState.maxRange > this.maxRange;
+
+    return { selection: new Selection( newState ), extended }
   }
 
   setRanges ( state ) {
@@ -99,53 +107,51 @@ class Text {
     this.selection = selection;
     this.data = data;
   }
+  
   get linesCount () {
     return this.data.length;
   }
+
   get value () {
-    let copy = this.data.slice();
-    let lines = copy.map( line => line.join('') )
-    return lines.join('\n');
+    return this.data.as2DArray()
+      .map( string => string
+        .map( input => getSymbol( ...Object.values( this.decodeInput( input ) ) ) )
+        .join('') )
+      .join('\n')
   }
 
   syncState (action) {
     if (!action.selection) return;
 
-    const selection = this.selection.syncState( action.selection );
+    const { selection, extended } = this.selection.syncState( action.selection );
 
-    const element = (x,y) => this.data.get(x,y) || -1;
-    const data = new Matrix(selection.lines, selection.maxRange, element);
+    let data = this.data;
+
+    if (true) {
+      const element = (x,y) => this.data.get(x,y) || -1;
+      data = new Matrix(selection.maxRange, selection.lines, element);
+    }
 
     return new Text ( data, selection );
   }
 
-  _all (line, index) {
-    return '';
-    let copy = this.data.slice(), lineCopy;
-    let lines = copy.map( (data,lineIndex) => {
-      lineCopy = data;
-      if (lineIndex === line) {
-        lineCopy = data.slice();
-        if (lineCopy[index]) {
-          lineCopy[index] = `_${copy[line][index]}_`;
-        } else {
-          lineCopy[index] = '_';
-        }
-      }
-      return lineCopy.join('');
-    } );
+  encodeInput ( keyCode, altKey, shiftKey ) {
+    return parseInt( `${keyCode}${ + altKey }${ + shiftKey }` );
+  }
 
-    return lines.join('\n');
+  decodeInput ( value ) {
+    let a = Array.from( String(value), (num) => Number(num));
+
+    return {
+      keyCode: Number(a.slice(0,-2).join('')),
+      altKey: !!a[a.length - 1],
+      shiftKey: !!a[a.length - 2]
+    }
   }
-  _lineAt ( index ) {
-    return this.data[index].join('');
-  }
-  _symbolAt ( line, index ) {
-    if (this.data[line])
-      return this.data[line][index];
-  }
-  put (value) {
-    this.data.set( this.selection.caret, this.selection.line, value )
+
+  put (input) {
+    let code = this.encodeInput( input.keyCode,input.altKey,input.shiftKey );
+    this.data.set( this.selection.caret, this.selection.line, code );
     return this;
   }
   break (line,index) {
@@ -160,8 +166,7 @@ class Text {
   }
   remove (line,index,amount=1) {
     let copy = this.data.slice();
-    if (copy[line]&&copy[index+amount])
-      copy[line].splice(index++,amount);
+    if (copy[line]&&copy[index+amount]) copy[line].splice(index++,amount);
     return {text:new Text(_,this.lineSize,copy),cursor:index};
   }
   static clear () {
@@ -170,24 +175,28 @@ class Text {
 }
 
 function keyup ( state, dispatch ) {
+  return;
   let line = state.line;
   if (line > 0) line -= 1;
   dispatch( {line} );
 }
 
 function keydown ( state, dispatch ) {
+  return;
   let lines = state.text.lines,line = state.line;
   if (state.line < lines) line += 1;
   dispatch( {line} );
 }
 
 function keyleft ( state, dispatch ) {
+  return;
   let cursor = state.cursor;
   if (state.cursor > 0) cursor -= 1;
   dispatch( {cursor} );
 }
 
 function keyright ( state, dispatch ) {
+  return;
   let cursor = state.cursor;
   if (state.cursor < state.text.length - 1) cursor += 1;
   dispatch( {cursor} );
@@ -195,8 +204,8 @@ function keyright ( state, dispatch ) {
 
 function keyenter ( state, dispatch ) {
   console.log( 'key enter', state )
-  let { text,line } = state.text.break(state.selection.line, state.selection.caret);
-  dispatch( {text,line,cursor:0} );
+  let { text } = state.text.break(state.selection.line, state.selection.caret);
+  dispatch( { text } );
 }
 
 function keybackspace ( state, dispatch ) {
@@ -205,36 +214,37 @@ function keybackspace ( state, dispatch ) {
 }
 
 function keyescape ( state, dispatch ) {
+  return;
   dispatch( {focus: false} )
 }
 
 function keyhome ( state, dispatch ) {
+  return;
   dispatch( {cursor: 0, line:0} );
 }
 
 function keyend ( state, dispatch ) {
+  return;
   let endLine = state.text.linesCount - 1;
   let endLen = state.text._lineAt( endLine ).length;
   dispatch( {line:endLine,cursor:endLen&&--endLen} )
 }
 
-function handleControl ( {event,history}, dispatch ) {
+function handleControl ( state, {event,history}, dispatch ) {
   let controlName = getControlName(event.keyCode);
-  try { constrolActions[`key${controlName}`]( this, dispatch ); } 
+  try { constrolActions[`key${controlName}`]( state, dispatch ); } 
   catch (e) {}
 }
 
-function handleSymbol ( {event,history}, dispatch ) {
-  let code = parseInt( `${event.keyCode}${event.altKey?1:0}${event.shiftKey?1:0}` );
-  let text = this.text.put( code );
+function handleSymbol ( state, {event,history}, dispatch ) {
+  let text = state.text.put( event );
   if (text) dispatch( {text,cursor:event.selection.caret} );
 }
 
-function handleSelection ( {event,history}, dispatch ) {
-  let text = this.text.syncState( {selection:event.selection} );
+function handleSelection ( state, {event,history}, dispatch ) {
+  let text = state.text.syncState( {selection:event.selection} );
   dispatch( { text } );
 }
-
 
 const constrolActions = { keyup,keydown,keyleft,keyright,keyenter,keybackspace,keyescape,keyhome,keyend };
 const inputHandlers = { handleControl, handleSymbol }
@@ -283,13 +293,14 @@ class InputTranslator {
     function listen ( {event,history} ) {
       const inputType = defineType(event.keyCode);
 
-      try { inputHandlers[`handle${capitalizeFirstLetter(inputType)}`]
-        .call( scope.state, {event, history}, dispatch ) } 
-      catch (e) { console.log(e) }
+      try { 
+        const f = inputHandlers[`handle${capitalizeFirstLetter(inputType)}`];
+        f instanceof Function && f( scope.state, {event, history}, dispatch );
+      } catch (e) { console.error(e) }
     }
 
     function selection ( {event,history} ) {
-      handleSelection.call( scope.state, {event,history}, dispatch );
+      handleSelection( scope.state, {event,history}, dispatch );
     }
   }
 }
@@ -300,7 +311,8 @@ class Anchor {
     this.element = document.createElement('div');
   }
   syncState (state) {
-    this.element.textContent = state.text._all(state.line,state.cursor);
+    this.element.textContent = state.text.value;
+    //this.element.textContent = 'asdas';
   }
   mount (container) {
     if ( container instanceof HTMLElement )
