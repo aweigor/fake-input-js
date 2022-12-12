@@ -37,6 +37,7 @@ class Range {
       start: 0,
       end: 0
     }
+    this.isNewRange = true;
   }
 
   get size () {
@@ -81,27 +82,54 @@ class Selection {
   }
 
   setRanges ( state ) {
-    let ranges = [], range, maxRange;
+    let ranges = this.ranges.slice(), range, maxRange;
 
-    for ( let i = 0; i < state.lines; i++ ) {
-      
-      range = this.ranges[i] || new Range(i);
+    if ( ranges.length < state.lines ) {
+      for ( let i = 0, l = state.lines - ranges.length; i < l; i++ ) {
+        ranges.splice( state.line + i, 0, new Range( i ) );
+      }
+    }
 
-      if (range.index == state.line) {
-        range.selected = {
-          start:state.caret,
-          end:state.selected
-        }
-        if (state.caret > range.end) {
-          range.end = state.caret; 
-        }
-      }  
-      ranges[i] = range;
+    if (ranges[state.line]) {
+      ranges[state.line].selected = {
+        start:state.caret,
+        end:state.selected
+      }
+      if (state.caret > ranges[state.line].end) {
+        ranges[state.line].end = state.caret; 
+      }
     }
 
     maxRange = Math.max( ...ranges.map( item => item.size ) );
 
     return { ranges, maxRange };
+  }
+
+  getRange ( index ) {
+    const range = this.ranges[index];
+    const isNewRange = range.isNewRange;
+    
+    return { range,isNewRange };
+  }
+
+  getLine ( index ) {
+    let resIndex = 0;
+
+    for( let i = 0; i <= index; i++ ) {
+      const { range,isNewRange } = this.getRange(i);
+      if (i == index) {
+        if ( isNewRange ) return -1;
+        return resIndex;
+      }
+      if ( !isNewRange ) ++resIndex;
+    }
+
+    return resIndex;
+  }
+
+  setOld () {
+    this.ranges.forEach( range => range.isNewRange = false )
+    return this;
   }
 }
 
@@ -125,17 +153,21 @@ class Text {
 
   syncState (action) {
     if (!action.selection) return;
-
     const { selection, extended } = this.selection.syncState( action.selection );
 
     let data = this.data;
 
     if (extended) {
-      const element = (x,y) => this.data.get(x,y) || -1;
+      const element = (x,y) => {
+        // check line number. if range is new - it is not included in data yet, so data for this index is empty
+        let line = selection.getLine(y);
+        if ( line !== -1 ) return this.data.get(x,line) || -1;
+        return -1;
+      }
       data = new Matrix(selection.maxRange, selection.lines, element);
     }
 
-    return new Text ( data, selection );
+    return new Text ( data, selection.setOld() );
   }
 
   encodeInput ( keyCode, altKey, shiftKey ) {
@@ -159,14 +191,6 @@ class Text {
   }
   break () {
     return
-    let copy = this.data.slice(),first,second,newline = line;
-    if (copy[line]) {
-      first = copy[line].slice(0,index);
-      second = copy[line].slice(index,0);
-      copy[line] = first;
-      copy.splice(++newline,0,second);
-    }
-    return {text:new Text(_,this.lineSize,copy),line:newline};
   }
   remove (line,index,amount=1) {
     let copy = this.data.slice();
