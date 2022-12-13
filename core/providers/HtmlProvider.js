@@ -99,14 +99,17 @@ export default class HtmlProvider extends BufferProvider {
 
       if (!isDescendant(scope.input._el, selection.focusNode)) {
         return scope._buffer.syncState( 
-          Object.assign( {},event,{selection:{ focus:false }} ) )
+          Object.assign( {}, event, { selection:{ focus:false } } ) )
       };
+      
+      let paragraphs = scope.input._el.innerText.split('\n\n');
 
       event.selection = {
         caret: selection.focusOffset,
         selected: selection.anchorOffset,
         line: getLine(scope.input, selection),
-        lines: scope.input._el.innerText.split('\n').length,
+        lines: paragraphs.reduce( ( acc, el ) => 
+          el.split('\n').length + acc, 0 ),
         text: scope.input._el.innerText,
         focus: true
       }

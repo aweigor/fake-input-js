@@ -190,13 +190,20 @@ class Text {
     return this;
   }
   break () {
-    return
+    this.reap()
+    //console.log('breaking lines')
+    return;
   }
-  remove (line,index,amount=1) {
-    let copy = this.data.slice();
-    if (copy[line]&&copy[index+amount]) copy[line].splice(index++,amount);
-    return {text:new Text(_,this.lineSize,copy),cursor:index};
+  remove () {
+    this.reap();
+    //console.log('remove lines')
+    return;
   }
+
+  reap () {
+    console.log( 'reap', this.data, this.selection );
+  }
+
   static clear () {
     return new Text();
   }
