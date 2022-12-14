@@ -69,10 +69,17 @@ export default class HtmlProvider extends BufferProvider {
 
     const scope = this;
 
-    function getLine (input,selection) {
+    function getFocusLine (input,selection) {
       let index = input.indexOf( selection.focusNode.parentElement ) !== -1 
         ? input.indexOf( selection.focusNode.parentElement ) 
         : input.indexOf( selection.focusNode );
+      return index + 1;
+    }
+
+    function getAnchorLine (input,selection) {
+      let index = input.indexOf( selection.anchorNode.parentElement ) !== -1 
+        ? input.indexOf( selection.anchorNode.parentElement ) 
+        : input.indexOf( selection.anchorNode );
       return index + 1;
     }
 
@@ -97,6 +104,8 @@ export default class HtmlProvider extends BufferProvider {
 
       const event = { type:'selection' };
 
+      console.log('handle selection change', selection)
+
       if (!isDescendant(scope.input._el, selection.focusNode)) {
         return scope._buffer.syncState( 
           Object.assign( {}, event, { selection:{ focus:false } } ) )
@@ -107,7 +116,8 @@ export default class HtmlProvider extends BufferProvider {
       event.selection = {
         caret: selection.focusOffset,
         selected: selection.anchorOffset,
-        line: getLine(scope.input, selection),
+        focusLine: getFocusLine(scope.input, selection),
+        anchorLine: getAnchorLine(scope.input, selection),
         lines: paragraphs.reduce( ( acc, el ) => 
           el.split('\n').length + acc, 0 ),
         text: scope.input._el.innerText,

@@ -17,7 +17,8 @@ class BufferState {
       selection: {
         caret: Number(),
         selected: Number(),
-        line: Number(),
+        focusLine: Number(),
+        anchorLine: Number(),
         lines: Number(),
         text: String(),
         focus: Boolean()
