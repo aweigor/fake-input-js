@@ -103,9 +103,7 @@ export default class HtmlProvider extends BufferProvider {
     function handleSelectionChange () {
 
       const event = { type:'selection' };
-
-      console.log('handle selection change', selection)
-
+      
       if (!isDescendant(scope.input._el, selection.focusNode)) {
         return scope._buffer.syncState( 
           Object.assign( {}, event, { selection:{ focus:false } } ) )

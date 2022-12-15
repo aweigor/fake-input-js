@@ -7,8 +7,9 @@ class Matrix {
     this.content = [];
 
     for (let y = 0; y < height; y++)
-      for (let x = 0; x < width; x++)
-        this.content[ y * width + x ] = element(x, y);
+      for (let x = 0; x < width-1; x++) 
+      { this.content[ y * width + x ] = element(x, y); }
+        
   }
   get (x, y) {
     if (this.width <= x) return -1;
@@ -57,19 +58,34 @@ class Range {
   }
 
   get isRemoved () {
-    return this._removed.start === this.start
-      && this._removed.end == this.end;
+    return this.end !== this.start
+      && this._removed.start === this.start
+      && this._removed.end == this.end
   }
 
   set selected (selection) {
-    //console.log('set selected', selection.start,selection.end, selection);
+    
     this._selected.start = selection.start||0;
     this._selected.end = selection.end||0;
+    
+  }
+
+  get removed () {
+    return this._removed;
   }
 
   removeSelected () {
     this._removed.start = this._selected.start;
     this._removed.end = this._selected.end;
+  }
+
+  remove ( start,end ) {
+    if (this._removed.start > start) {
+      this._removed.start = start
+    }
+    if (this._removed.end < end) {
+      this._removed.end = end
+    }
   }
 }
 
@@ -89,17 +105,16 @@ class Selection {
   syncState ( state ) {
     const { ranges, maxRange } = this.getRanges( state );
     const newState = Object.assign( {}, state, { maxRange, ranges } );
-    const extended = newState.lines > this.lines || newState.maxRange > this.maxRange;
 
-    return { selection: new Selection( newState ), extended }
+    return { selection: new Selection( newState ) }
   }
 
   getRanges ( state ) {
-    let prevRanges = this.ranges.slice();
+    let prevRanges = this.ranges.slice(), ranges = [], maxRange;
+
     const anchorLine = state.anchorLine;
     const focusLine = state.focusLine;
 
-    console.log('get ranges', state)
     /*
     Extracts element from array:
     - if array contains index, it removes element from array
@@ -112,31 +127,24 @@ class Selection {
       } else return array.shift();
     }
 
-    let ranges = [], maxRange;
-
     for ( let i = state.lines-1; i >= 0; i-- ) {
       while( !ranges[i] || ranges[i].isRemoved ) {
         if (prevRanges.length <= anchorLine && !prevRanges[i]) 
-          ranges[i] = new Range(i)
+        { ranges[i] = new Range(i) }
         else ranges[i] = extractElement( prevRanges,i )
       }
     }
-
-    console.log('get ranges', ranges)
-
     
+    for ( let i = anchorLine, l = anchorLine - focusLine; i < anchorLine + l; l > 0 ? l-- : l++ )
+    { ranges[i].selected = { start:ranges[i].start,end:ranges[i].end }; }
 
-    /*
-    if (ranges[state.line]) {
-      ranges[state.focusLine].selected = {
-        start:state.caret,
-        end:state.selected
-      }
-      if (state.caret > ranges[state.line].end) {
-        ranges[state.line].end = state.caret; 
-      }
+    if (state.caret > ranges[state.focusLine].end) 
+    { ranges[state.focusLine].end = state.caret; }
+
+    ranges[state.focusLine].selected = {
+      start:state.caret,
+      end:state.selected 
     }
-    */
 
     maxRange = Math.max( ...ranges.map( item => item.size ) );
 
@@ -146,8 +154,16 @@ class Selection {
   getRange ( index ) {
     const range = this.ranges[index];
     const isNewRange = range.isNewRange;
+
+    if (range.isNewRange) {
+      range.isNewRange = false;
+    }
     
     return { range,isNewRange };
+  }
+
+  trimRange ( index, start, end ) {
+    this.ranges[index]&&this.ranges[index].remove(start,end)
   }
 
   getLineIndex ( index ) {
@@ -155,6 +171,7 @@ class Selection {
 
     for( let i = 0; i <= index; i++ ) {
       const { range,isNewRange } = this.getRange(i);
+
       if (i == index) {
         if ( isNewRange ) return -1;
         return resIndex;
@@ -165,10 +182,18 @@ class Selection {
     return resIndex;
   }
 
-  getCharIndex ( index, line ) {
+  getCharIndex ( line,index ) {
+    if (line == -1) return -1;
+    const range = this.ranges[line];
 
+    if (range.removed.start < index && range.removed.end >= index) {
+      if (range.removed.end < range.end) 
+        return (range.removed.end + (index - range.removed.start) )
+      return -1;
+    }
+    return index;
   }
-
+  
   setOld () {
     this.ranges.forEach( range => range.isNewRange = false );
     return this;
@@ -186,11 +211,13 @@ class Text {
   }
 
   get value () {
-    return this.data.as2DArray()
+    let value = this.data.as2DArray()
       .map( string => string
         .map( input => getSymbol( ...Object.values( this.decodeInput( input ) ) ) )
         .join('') )
       .join('<br>')
+
+    return value;
   }
 
   syncState (action) {
@@ -199,19 +226,15 @@ class Text {
 
     let data = this.data;
 
-    if (extended) {
-      const element = (x,y) => {
-        // check line number. if range is new - it is not included in data yet, so data for this index is empty
-        let lineIndex = selection.getLineIndex(y);
-        //let charIndex = selection.getCharIndex(x,line);
+    const element = (x,y) => 
+    {
+      let lineIndex = selection.getLineIndex(y);
+      let charIndex = selection.getCharIndex(lineIndex,x);
+      if ( lineIndex !== -1 && charIndex !== -1 ) return this.data.get(charIndex,lineIndex) || -1;
 
-        //console.log( 'char index', charIndex );
-
-        if ( lineIndex !== -1 ) return this.data.get(x,lineIndex) || -1;
-        return -1;
-      }
-      data = new Matrix(selection.maxRange, selection.lines, element);
+      return -1;
     }
+    data = new Matrix(selection.maxRange, selection.lines, element);
 
     return new Text ( data, selection.setOld() );
   }
@@ -231,23 +254,25 @@ class Text {
   }
 
   put ( data ) {
+    this.reap();
     let code = this.encodeInput( data.keyCode,data.altKey,data.shiftKey );
-    this.data.set( this.selection.caret, this.selection.line, code );
+    this.data.set( this.selection.caret, this.selection.focusLine, code );
     return this;
   }
   break () {
     this.reap()
-    //console.log('breaking lines')
-    return;
+    return this;
   }
   remove () {
     this.reap();
-    //console.log('remove lines')
-    return;
+
+    this.selection.trimRange( this.selection.focusLine, this.selection.caret - 1, this.selection.caret )
+    if (this.selection.caret !== 0)
+      this.selection.caret-=1
+    return this.syncState({selection:this.selection});
   }
 
   reap () {
-    console.log( 'reap', this.data, this.selection );
     this.selection.ranges.forEach( r => r.removeSelected() );
   }
 
@@ -265,10 +290,13 @@ function keyhome ( state, dispatch ) {}
 function keyend ( state, dispatch ) {}
 
 function keyenter ( state, dispatch ) {
-  let { text } = state.text.break();
+  let text = state.text.break();
   dispatch( { text } );
 }
-function keybackspace ( state, dispatch ) {}
+function keybackspace ( state, dispatch ) {
+  let text = state.text.remove();
+  dispatch( { text } );
+}
 
 function handleControl ( state, {event,history}, dispatch ) {
   let controlName = getControlName(event.keyCode);
@@ -339,8 +367,6 @@ class InputTranslator {
     }
 
     function selection ( {event,history} ) {
-
-      //console.log('handle selection',event,event.selection,event.selection.caret,event.selection.selected)
       handleSelection( scope.state, {event,history}, dispatch );
     }
   }
