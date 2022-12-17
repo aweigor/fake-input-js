@@ -1,28 +1,74 @@
+/*
+ver. 2.0
+*/
+
+
 import { getSymbol, defineType, getControlName } from './format.js';
 
-class Matrix {
-  constructor( width = 0, height = 1, element = (x,y) => -1 ) {
-    this.width = width;
-    this.height = height;
-    this.content = [];
+class ListItem {
+  constructor ( data = null, { next, next_selected } = {} ) {
+    Object.assign(this, { data, next, next_selected });
+  }
+}
 
-    for (let y = 0; y < height; y++)
-      for (let x = 0; x < width-1; x++) 
-      { this.content[ y * width + x ] = element(x, y); }
-        
+class List {
+  constructor ( head = null ) {
+    this.head = head;
   }
-  get (x, y) {
-    if (this.width <= x) return -1;
-    return this.content[y * this.width + x];
+
+  add ( index, item ) {
+    let i = 0;
+
+    for ( let current of this ) {
+      if ( i == index ) {
+        item.next = current.next;
+        current.next = item;
+        break;
+      };
+    }
   }
-  set (x, y, value) {
-    this.content[y * this.width + x] = value;
+
+  remove ( start, end ) {
+    // not implemented
   }
-  getString (y) {
-    return this.content.slice( y * this.width, y * this.width + this.width );
+
+  find (index) {
+    let i = 0, result;
+
+    for ( let element of this ) {
+      if ( i == index ) result = element;
+      else i++;
+    }
+
+    return result;
   }
-  as2DArray () {
-    return Array.from( new Array(this.height), ( v,i ) => this.getString(i) )
+
+  [Symbol.iterator]() {
+    let data  = this.head, value;
+
+    return {
+      next: () => {
+        value = data;
+        data = data&&data.next;
+        return ({ value, done: !value });
+      }
+    }
+  }
+}
+
+class LineSymbol extends ListItem {
+  constructor ( data = null ) {
+    super( data );
+  }
+}
+
+class Line extends ListItem {
+  constructor ( data = new List() ) {
+    super( data );
+    this.data.head = new LineSymbol( 0 ); // new line;
+  }
+  find( index ) {
+
   }
 }
 
@@ -43,7 +89,7 @@ class Range {
   }
 
   get size () {
-    return Math.abs(this.end - this.start) + 1;
+    return Math.abs(this.end - this.start);
   }
 
   get index () {
@@ -80,12 +126,8 @@ class Range {
   }
 
   remove ( start,end ) {
-    if (this._removed.start > start) {
-      this._removed.start = start
-    }
-    if (this._removed.end < end) {
-      this._removed.end = end
-    }
+    if (this._removed.start > start) this._removed.start = start;
+    if (this._removed.end < end) this._removed.end = end;
   }
 }
 
@@ -106,7 +148,7 @@ class Selection {
     const { ranges, maxRange } = this.getRanges( state );
     const newState = Object.assign( {}, state, { maxRange, ranges } );
 
-    return { selection: new Selection( newState ) }
+    return new Selection( newState );
   }
 
   getRanges ( state ) {
@@ -147,6 +189,8 @@ class Selection {
     }
 
     maxRange = Math.max( ...ranges.map( item => item.size ) );
+
+    //console.log('caret', state.caret, maxRange)
 
     return { ranges, maxRange };
   }
@@ -200,10 +244,21 @@ class Selection {
   }
 }
 
+class Caret {
+  constructor ( element ) {
+    this.next = element;
+    this.prev = element;
+  }
+  syncState( selection ) {
+    console.log( 'sync state caret', selection );
+
+  }
+}
+
 class Text {
-  constructor ( data = new Matrix(), selection = new Selection() ) {
-    this.selection = selection;
-    this.data = data;
+  constructor ( lines = new List( new Line() ) ) {
+    this.lines = lines;
+    this.caret = new Caret ( this.lines.head.data.head )
   }
   
   get linesCount () {
@@ -211,6 +266,8 @@ class Text {
   }
 
   get value () {
+    console.log('get value', this.lines);
+    return
     let value = this.data.as2DArray()
       .map( string => string
         .map( input => getSymbol( ...Object.values( this.decodeInput( input ) ) ) )
@@ -220,23 +277,20 @@ class Text {
     return value;
   }
 
-  syncState (action) {
-    if (!action.selection) return;
-    const { selection, extended } = this.selection.syncState( action.selection );
+  syncSelection (selection) {
+    const caretLine = this.lines.find( selection.focusLine );
+    const element = caretLine.find( selection.caret );
 
-    let data = this.data;
+    console.log('sync state', selection );
 
-    const element = (x,y) => 
-    {
-      let lineIndex = selection.getLineIndex(y);
-      let charIndex = selection.getCharIndex(lineIndex,x);
-      if ( lineIndex !== -1 && charIndex !== -1 ) return this.data.get(charIndex,lineIndex) || -1;
+    this.caret = this.caret.syncState( selection );
 
-      return -1;
-    }
-    data = new Matrix(selection.maxRange, selection.lines, element);
+    return;
+  }
 
-    return new Text ( data, selection.setOld() );
+  syncData ( code, selection ) {
+    const element = new LineSymbol( code );
+    this.data.add( selection.caret, element );
   }
 
   encodeInput ( keyCode, altKey, shiftKey ) {
@@ -253,27 +307,31 @@ class Text {
     }
   }
 
-  put ( data ) {
-    this.reap();
+  put ( data, selection ) {
     let code = this.encodeInput( data.keyCode,data.altKey,data.shiftKey );
-    this.data.set( this.selection.caret, this.selection.focusLine, code );
-    return this;
+    return this.syncData( code, selection );
   }
   break () {
-    this.reap()
+    this.reap();
+
     return this;
   }
   remove () {
     this.reap();
 
-    this.selection.trimRange( this.selection.focusLine, this.selection.caret - 1, this.selection.caret )
-    if (this.selection.caret !== 0)
-      this.selection.caret-=1
+    this.selection.trimRange( 
+      this.selection.focusLine, 
+      this.selection.caret - 1, 
+      this.selection.caret  )
+
+    if (this.selection.caret !== 0) this.selection.caret-=1
     return this.syncState({selection:this.selection});
   }
 
   reap () {
-    this.selection.ranges.forEach( r => r.removeSelected() );
+    for (let range of this.selection.ranges) {
+      range.removeSelected();
+    }
   }
 
   static clear () {
@@ -281,6 +339,7 @@ class Text {
   }
 }
 
+/* CONTROL FUNCTIONS */
 function keyup ( state, dispatch ) {}
 function keydown ( state, dispatch ) {}
 function keyleft ( state, dispatch ) {}
@@ -297,6 +356,7 @@ function keybackspace ( state, dispatch ) {
   let text = state.text.remove();
   dispatch( { text } );
 }
+/* CONTROL FUNCTIONS END */
 
 function handleControl ( state, {event,history}, dispatch ) {
   let controlName = getControlName(event.keyCode);
@@ -305,13 +365,14 @@ function handleControl ( state, {event,history}, dispatch ) {
 }
 
 function handleSymbol ( state, {event,history}, dispatch ) {
-  let text = state.text.put( event );
-  if (text) dispatch( {text,cursor:event.selection.caret} );
+  let text = state.text.put( event, state.selection );
+  if (text) dispatch( { text } );
 }
 
 function handleSelection ( state, {event,history}, dispatch ) {
-  let text = state.text.syncState( {selection:event.selection} );
-  dispatch( { text } );
+  let selection = state.selection.syncState( event.selection );
+  let text = state.text.syncSelection( selection );
+  dispatch( { selection } );
 }
 
 const constrolActions = { keyup,keydown,keyleft,keyright,keyenter,keybackspace,keyescape,keyhome,keyend };
@@ -324,6 +385,7 @@ class InputTranslator {
     const defaultState = {
       focus: false,
       text: new Text(),
+      selection: new Selection(),
       locale: 'en',
       keyboard_type: 'ancii',
     }
@@ -382,7 +444,7 @@ class Anchor {
   }
   mount (container) {
     if ( container instanceof HTMLElement )
-      return container.appendChild( this.input._el );
+      return container.appendChild( this.element );
     if ( typeof(container) == 'string' );
       if ( container = container.replace('#','') ) {
         container = document.getElementById( container );
