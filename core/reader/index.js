@@ -1,13 +1,11 @@
 /*
 ver. 2.0
 */
-
-
 import { getSymbol, defineType, getControlName } from './format.js';
 
 class ListItem {
-  constructor ( data = null, { next, next_selected } = {} ) {
-    Object.assign(this, { data, next, next_selected });
+  constructor ( data = null, { next } = {} ) {
+    Object.assign(this, { data, next });
   }
 }
 
@@ -28,16 +26,22 @@ class List {
     }
   }
 
-  remove ( start, end ) {
-    // not implemented
+  remove ( begin, end ) {
+    console.log('remove',begin, end)
+    let prev = this.find(begin);
+    let next = this.find(end);
+    if (prev && next) prev.next = next.next;
   }
 
   find (index) {
     let i = 0, result;
 
     for ( let element of this ) {
-      if ( i == index ) result = element;
-      else i++;
+      if ( i == index ) {
+        result = element;
+        break;
+      }
+      i++;
     }
 
     return result;
@@ -45,12 +49,11 @@ class List {
 
   [Symbol.iterator]() {
     let data  = this.head, value;
-
     return {
       next: () => {
         value = data;
         data = data&&data.next;
-        return ({ value, done: !value });
+        return ({ value, done: value == undefined });
       }
     }
   }
@@ -65,232 +68,117 @@ class LineSymbol extends ListItem {
 class Line extends ListItem {
   constructor ( data = new List() ) {
     super( data );
-    this.data.head = new LineSymbol( 0 ); // new line;
-  }
-  find( index ) {
-
-  }
-}
-
-class Range {
-  constructor (index=0) {
-    this._index = index;
-    this.start = 0;
-    this.end = 0;
-    this._selected = {
-      start: 0,
-      end: 0
-    }
-    this._removed = {
-      start: null,
-      end: null
-    }
-    this.isNewRange = true;
-  }
-
-  get size () {
-    return Math.abs(this.end - this.start);
-  }
-
-  get index () {
-    return this._index;
-  } 
-  set index (value) {
-    this._index = value;
-  }
-
-  get selected () {
-    return Object.assign({},this._selected,{size: Math.abs(this._selected.end - this._selected.start)})
-  }
-
-  get isRemoved () {
-    return this.end !== this.start
-      && this._removed.start === this.start
-      && this._removed.end == this.end
-  }
-
-  set selected (selection) {
-    
-    this._selected.start = selection.start||0;
-    this._selected.end = selection.end||0;
-    
-  }
-
-  get removed () {
-    return this._removed;
-  }
-
-  removeSelected () {
-    this._removed.start = this._selected.start;
-    this._removed.end = this._selected.end;
-  }
-
-  remove ( start,end ) {
-    if (this._removed.start > start) this._removed.start = start;
-    if (this._removed.end < end) this._removed.end = end;
+    this.data.head = new LineSymbol( 0 );
   }
 }
 
 class Selection {
 
   constructor ( state = {
-    caret: 0,
-    selected: 0,
+    focusOffset: 0,
+    anchorOffset: 0,
     focusLine: 0,
     anchorLine: 0,
     lines: 0,
-    ranges: [],
-    maxRange: 0,
     focus: false
   } ) { Object.assign(this, state); }
   
   syncState ( state ) {
-    const { ranges, maxRange } = this.getRanges( state );
-    const newState = Object.assign( {}, state, { maxRange, ranges } );
-
+    const newState = Object.assign( {}, state );
     return new Selection( newState );
-  }
-
-  getRanges ( state ) {
-    let prevRanges = this.ranges.slice(), ranges = [], maxRange;
-
-    const anchorLine = state.anchorLine;
-    const focusLine = state.focusLine;
-
-    /*
-    Extracts element from array:
-    - if array contains index, it removes element from array
-    - else removes and returns last element of array
-    */
-
-    function extractElement( array, index ) {
-      if ( array[index] !== undefined ) {
-        return  array.splice( index, 1 )[0];
-      } else return array.shift();
-    }
-
-    for ( let i = state.lines-1; i >= 0; i-- ) {
-      while( !ranges[i] || ranges[i].isRemoved ) {
-        if (prevRanges.length <= anchorLine && !prevRanges[i]) 
-        { ranges[i] = new Range(i) }
-        else ranges[i] = extractElement( prevRanges,i )
-      }
-    }
-    
-    for ( let i = anchorLine, l = anchorLine - focusLine; i < anchorLine + l; l > 0 ? l-- : l++ )
-    { ranges[i].selected = { start:ranges[i].start,end:ranges[i].end }; }
-
-    if (state.caret > ranges[state.focusLine].end) 
-    { ranges[state.focusLine].end = state.caret; }
-
-    ranges[state.focusLine].selected = {
-      start:state.caret,
-      end:state.selected 
-    }
-
-    maxRange = Math.max( ...ranges.map( item => item.size ) );
-
-    //console.log('caret', state.caret, maxRange)
-
-    return { ranges, maxRange };
-  }
-
-  getRange ( index ) {
-    const range = this.ranges[index];
-    const isNewRange = range.isNewRange;
-
-    if (range.isNewRange) {
-      range.isNewRange = false;
-    }
-    
-    return { range,isNewRange };
-  }
-
-  trimRange ( index, start, end ) {
-    this.ranges[index]&&this.ranges[index].remove(start,end)
-  }
-
-  getLineIndex ( index ) {
-    let resIndex = 0;
-
-    for( let i = 0; i <= index; i++ ) {
-      const { range,isNewRange } = this.getRange(i);
-
-      if (i == index) {
-        if ( isNewRange ) return -1;
-        return resIndex;
-      }
-      if ( !isNewRange ) ++resIndex;
-    }
-
-    return resIndex;
-  }
-
-  getCharIndex ( line,index ) {
-    if (line == -1) return -1;
-    const range = this.ranges[line];
-
-    if (range.removed.start < index && range.removed.end >= index) {
-      if (range.removed.end < range.end) 
-        return (range.removed.end + (index - range.removed.start) )
-      return -1;
-    }
-    return index;
-  }
-  
-  setOld () {
-    this.ranges.forEach( range => range.isNewRange = false );
-    return this;
   }
 }
 
 class Caret {
-  constructor ( element ) {
-    this.next = element;
-    this.prev = element;
+  constructor ( { nextLine, nextOffset, prevLine, prevOffset, focus_orient_forward } = {} ) {
+    Object.assign( this, { nextLine, nextOffset, prevLine, prevOffset, focus_orient_forward } );
   }
-  syncState( selection ) {
-    console.log( 'sync state caret', selection );
 
+  get prev () {
+    return this.prevLine && this.prevLine.data.find( this.prevOffset );
+  }
+
+  get next () {
+    return this.nextLine && this.nextLine.data.find( this.nextOffset );
+  }
+
+  syncState( selection, lines ) {
+    // orientation : a. focus ahead b. anchor ahead
+    const focus_orient_forward =  selection.anchorLine - selection.focusLine <= 0 
+      && selection.anchorOffset - selection.focusOffset <= 0;
+
+    let prevPos = {
+      line: focus_orient_forward ? selection.anchorLine : selection.focusLine,
+      offset: focus_orient_forward ? selection.anchorOffset - 1 : selection.focusOffset - 1
+    }
+
+    let nextPos = {
+      line: focus_orient_forward ? selection.focusLine : selection.anchorLine,
+      offset: focus_orient_forward ? selection.focusOffset : selection.anchorOffset
+    }
+
+    let prevLine = lines.find(prevPos.line);
+    let nextLine = lines.find(nextPos.line);
+
+    return new Caret( { 
+      nextLine, nextOffset:nextPos.offset, 
+      prevLine, prevOffset:prevPos.offset,
+      focus_orient_forward
+    } );
   }
 }
 
 class Text {
   constructor ( lines = new List( new Line() ) ) {
     this.lines = lines;
-    this.caret = new Caret ( this.lines.head.data.head )
+    this.caret = new Caret ( {nextLine:this.lines.head,nextOffset:0} )
   }
   
   get linesCount () {
     return this.data.length;
   }
 
-  get value () {
-    console.log('get value', this.lines);
-    return
-    let value = this.data.as2DArray()
-      .map( string => string
-        .map( input => getSymbol( ...Object.values( this.decodeInput( input ) ) ) )
-        .join('') )
-      .join('<br>')
+  get value () { 
 
-    return value;
+    let text = '';
+
+    for ( let line of this.lines ) {
+
+      text += '<br>'
+
+      for ( let lineSymbol of line.data ) {
+        if (lineSymbol.data !== 0) {
+          text += getSymbol( ...Object.values( 
+            this.decodeInput( lineSymbol.data ) ) ) 
+        } 
+      }
+    }
+
+    return text;
   }
 
   syncSelection (selection) {
-    const caretLine = this.lines.find( selection.focusLine );
-    const element = caretLine.find( selection.caret );
-
-    console.log('sync state', selection );
-
-    this.caret = this.caret.syncState( selection );
-
+    this.caret = this.caret.syncState( selection, this.lines );
     return;
   }
 
   syncData ( code, selection ) {
+    if (!this.caret.next) return; // todo: exeption
+
     const element = new LineSymbol( code );
-    this.data.add( selection.caret, element );
+    element.next = this.caret.next;
+
+    if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine){
+      this.caret.prevLine.next = this.caret.nextLine;
+    }
+      
+    if (this.caret.prev) {
+      this.caret.prev.next = element;
+    }
+      
+    if ( this.caret.nextLine && this.caret.nextOffset == 0 ) {
+      this.caret.nextLine.data.head = element;
+    }
   }
 
   encodeInput ( keyCode, altKey, shiftKey ) {
@@ -311,31 +199,27 @@ class Text {
     let code = this.encodeInput( data.keyCode,data.altKey,data.shiftKey );
     return this.syncData( code, selection );
   }
-  break () {
-    this.reap();
 
+  break () {
+    this.syncData( 0 );
+    let prevLine = this.caret.focus_orient_forward 
+    ? this.caret.nextLine : this.caret.prevLine;
+    if ( prevLine ) {
+      let newLine = new Line(); 
+      newLine.next = prevLine.next;
+      prevLine.next = newLine;
+    }
     return this;
   }
   remove () {
-    this.reap();
-
-    this.selection.trimRange( 
-      this.selection.focusLine, 
-      this.selection.caret - 1, 
-      this.selection.caret  )
-
-    if (this.selection.caret !== 0) this.selection.caret-=1
-    return this.syncState({selection:this.selection});
-  }
-
-  reap () {
-    for (let range of this.selection.ranges) {
-      range.removeSelected();
+    if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine){
+      this.caret.prevLine.next = this.caret.nextLine;
     }
-  }
-
-  static clear () {
-    return new Text();
+    if (this.caret.prev && this.caret.prev !== this.caret.next ) {
+      this.caret.prev.next = this.caret.next;
+    }
+    this.caret.nextLine.data.remove( --this.caret.nextOffset-1,this.caret.nextOffset )
+    return this;
   }
 }
 

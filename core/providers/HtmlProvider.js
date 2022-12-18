@@ -112,8 +112,8 @@ export default class HtmlProvider extends BufferProvider {
       let paragraphs = scope.input._el.innerText.split('\n\n');
 
       event.selection = {
-        caret: selection.focusOffset,
-        selected: selection.anchorOffset,
+        focusOffset: selection.focusOffset,
+        anchorOffset: selection.anchorOffset,
         focusLine: getFocusLine(scope.input, selection),
         anchorLine: getAnchorLine(scope.input, selection),
         lines: paragraphs.reduce( ( acc, el ) => 

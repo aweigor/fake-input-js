@@ -15,8 +15,8 @@ class BufferState {
       keyCode: Number(),
       timestamp: Number(),
       selection: {
-        caret: Number(),
-        selected: Number(),
+        focusOffset: Number(),
+        anchorOffset: Number(),
         focusLine: Number(),
         anchorLine: Number(),
         lines: Number(),
