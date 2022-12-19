@@ -14,37 +14,66 @@ class List {
     this.head = head;
   }
 
-  add ( index, item ) {
-    let i = 0;
-
-    for ( let current of this ) {
-      if ( i == index ) {
+  insertAfter ( item, index ) {
+    if (index == -1) {
+      item.next = this.head;
+      this.head = item;
+    } else if (index == 0) {
+      item.next = this.head.next;
+      this.head.next = item;
+    } else if ( index > 0 ) {
+      let current = this.find( index );
+      if (current) {
         item.next = current.next;
         current.next = item;
-        break;
+      }
+    }
+  }
+
+  insertBefore ( item, index ) {
+    if ( index == 0 ) {
+      item.next = this.head;
+      this.head = item;
+    } else if ( index > 0 ) {
+      let prev = this.findPrev( index );
+      if ( prev ) {
+        item.next = prev.next;
+        prev.next = item;
+      }
+    }
+  }
+
+  find ( index ) {
+    let i = 0, item;
+    for ( item of this ) {
+      if ( i++ == index ) break;
+    }
+    return item;
+  }
+
+  findNext ( index ) {
+    let i = 0, item;
+    for ( item of this ) {
+      if ( i++ == index ) {
+        return item.next;
       };
     }
+    return null;
+  }
+
+  findPrev ( index ) {
+    let i = 0, prev;
+    for ( let item of this ) {
+      if ( i++ == index ) break;
+      prev = item;
+    }
+    return prev;
   }
 
   remove ( begin, end ) {
-    console.log('remove',begin, end)
     let prev = this.find(begin);
     let next = this.find(end);
     if (prev && next) prev.next = next.next;
-  }
-
-  find (index) {
-    let i = 0, result;
-
-    for ( let element of this ) {
-      if ( i == index ) {
-        result = element;
-        break;
-      }
-      i++;
-    }
-
-    return result;
   }
 
   [Symbol.iterator]() {
@@ -129,9 +158,9 @@ class Caret {
 }
 
 class Text {
-  constructor ( lines = new List( new Line() ) ) {
+  constructor ( lines = new List( new Line() ), caret ) {
     this.lines = lines;
-    this.caret = new Caret ( {nextLine:this.lines.head,nextOffset:0} )
+    this.caret = caret || new Caret ( {nextLine:this.lines.head,nextOffset:0} );
   }
   
   get linesCount () {
@@ -141,10 +170,9 @@ class Text {
   get value () { 
 
     let text = '';
-
     for ( let line of this.lines ) {
 
-      text += '<br>'
+      text += '<br>';
 
       for ( let lineSymbol of line.data ) {
         if (lineSymbol.data !== 0) {
@@ -162,23 +190,11 @@ class Text {
     return;
   }
 
-  syncData ( code, selection ) {
-    if (!this.caret.next) return; // todo: exeption
-
-    const element = new LineSymbol( code );
-    element.next = this.caret.next;
-
-    if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine){
-      this.caret.prevLine.next = this.caret.nextLine;
-    }
-      
-    if (this.caret.prev) {
-      this.caret.prev.next = element;
-    }
-      
-    if ( this.caret.nextLine && this.caret.nextOffset == 0 ) {
-      this.caret.nextLine.data.head = element;
-    }
+  resolveSelection () {
+    if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine) {
+      this.caret.prevLine.next = this.caret.nextLine.next; this.caret.nextLine = this.caret.prevLine };
+    if (this.caret.prev && this.caret.prev !== this.caret.next ) {
+      this.caret.prev.next = this.caret.next; }
   }
 
   encodeInput ( keyCode, altKey, shiftKey ) {
@@ -195,30 +211,30 @@ class Text {
     }
   }
 
-  put ( data, selection ) {
-    let code = this.encodeInput( data.keyCode,data.altKey,data.shiftKey );
-    return this.syncData( code, selection );
+  put ( data ) {
+    this.resolveSelection();
+
+    const code = this.encodeInput( data.keyCode,data.altKey,data.shiftKey );
+    const element = new LineSymbol( code );
+
+    this.caret.prevLine.data.insertAfter( element, this.caret.prevOffset );
   }
 
   break () {
-    this.syncData( 0 );
+    this.resolveSelection();
+
     let prevLine = this.caret.focus_orient_forward 
-    ? this.caret.nextLine : this.caret.prevLine;
+      ? this.caret.nextLine : this.caret.prevLine;
     if ( prevLine ) {
       let newLine = new Line(); 
       newLine.next = prevLine.next;
       prevLine.next = newLine;
     }
+
     return this;
   }
   remove () {
-    if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine){
-      this.caret.prevLine.next = this.caret.nextLine;
-    }
-    if (this.caret.prev && this.caret.prev !== this.caret.next ) {
-      this.caret.prev.next = this.caret.next;
-    }
-    this.caret.nextLine.data.remove( --this.caret.nextOffset-1,this.caret.nextOffset )
+    this.resolveSelection();
     return this;
   }
 }
