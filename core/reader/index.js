@@ -4,39 +4,76 @@ ver. 2.0
 import { getSymbol, defineType, getControlName } from './format.js';
 
 class ListItem {
-  constructor ( data = null, { next } = {} ) {
-    Object.assign(this, { data, next });
+  constructor ( data = null, { next, prev } = {} ) {
+    Object.assign(this, { data, next, prev });
   }
 }
 
 class List {
-  constructor ( head = null ) {
-    this.head = head;
+  constructor ( element = null ) {
+    this.head = element;
+    this.tail = element;
   }
 
   insertAfter ( item, index ) {
-    if (index == -1) {
+    if ( index == -1 ) {
+
+      this.head.prev = item;
       item.next = this.head;
       this.head = item;
+
     } else if (index == 0) {
-      item.next = this.head.next;
-      this.head.next = item;
-    } else if ( index > 0 ) {
-      let current = this.find( index );
-      if (current) {
-        item.next = current.next;
-        current.next = item;
+
+      if (this.head == this.tail) {
+
+        this.tail = item;
+        item.next = null;
+
+      } else if (this.head.next) {
+
+        item.next = this.head.next;
+        item.next.prev = item;
+
       }
+      this.head.next = item;
+
+    } else if ( index > 0 ) {
+
+      let current = this.find( index );
+
+      if ( !current ) return;
+         
+      if ( current.next ) {
+
+        item.next = current.next;
+        current.next.prev = item;
+
+      } else {
+
+        item.next = null;
+        this.tail - item;
+
+      }
+
+      current.next = item;
+      item.prev = current;
+      
     }
   }
 
   insertBefore ( item, index ) {
     if ( index == 0 ) {
+      
+      this.head.prev = item;
       item.next = this.head;
+      item.prev = null;
       this.head = item;
+
     } else if ( index > 0 ) {
+
       let prev = this.findPrev( index );
       if ( prev ) {
+        prev.next.prev = item;
         item.next = prev.next;
         prev.next = item;
       }
@@ -70,10 +107,38 @@ class List {
     return prev;
   }
 
-  remove ( begin, end ) {
-    let prev = this.find(begin);
-    let next = this.find(end);
-    if (prev && next) prev.next = next.next;
+  remove ( index ) {
+    let element = this.find( index );
+
+    console.log('remove', element)
+    
+    if ( element ) {
+
+      if ( !element.prev && !element.mext ) return;
+
+      if ( element.prev && element.next ) {
+
+        element.next.prev = element.prev;
+        element.prev.next = element.next;
+
+      } else if ( element.prev ) {
+
+        element.prev.next = null;
+
+      } else if ( element.next ) {
+
+        element.next.prev = null;
+
+      }
+
+      if ( this.tail == element ) {
+        this.tail = element.prev || null;
+      }
+
+      if ( this.head == element ) {
+        this.head = element.next || null;
+      }
+    }
   }
 
   [Symbol.iterator]() {
@@ -98,6 +163,7 @@ class Line extends ListItem {
   constructor ( data = new List() ) {
     super( data );
     this.data.head = new LineSymbol( 0 );
+    this.data.tail = this.data.head;
   }
 }
 
@@ -119,8 +185,9 @@ class Selection {
 }
 
 class Caret {
-  constructor ( { nextLine, nextOffset, prevLine, prevOffset, focus_orient_forward } = {} ) {
-    Object.assign( this, { nextLine, nextOffset, prevLine, prevOffset, focus_orient_forward } );
+  constructor ( { nextLine, nextOffset, nextLineOffset, prevLine, prevOffset, prevLineOffset, focus_orient_forward } = {} ) {
+    Object.assign( this, { nextLine, nextOffset, nextLineOffset, prevLine, prevOffset, prevLineOffset, focus_orient_forward } );
+    //console.log('CARET', this.prev, this.next );
   }
 
   get prev () {
@@ -131,8 +198,8 @@ class Caret {
     return this.nextLine && this.nextLine.data.find( this.nextOffset );
   }
 
+  // orientation : a. focus ahead b. anchor ahead
   syncState( selection, lines ) {
-    // orientation : a. focus ahead b. anchor ahead
     const focus_orient_forward =  selection.anchorLine - selection.focusLine <= 0 
       && selection.anchorOffset - selection.focusOffset <= 0;
 
@@ -150,8 +217,8 @@ class Caret {
     let nextLine = lines.find(nextPos.line);
 
     return new Caret( { 
-      nextLine, nextOffset:nextPos.offset, 
-      prevLine, prevOffset:prevPos.offset,
+      nextLine, nextOffset:nextPos.offset, nextLineOffset:nextPos.line,
+      prevLine, prevOffset:prevPos.offset, prevLineOffset:prevPos.line,
       focus_orient_forward
     } );
   }
@@ -160,7 +227,7 @@ class Caret {
 class Text {
   constructor ( lines = new List( new Line() ), caret ) {
     this.lines = lines;
-    this.caret = caret || new Caret ( {nextLine:this.lines.head,nextOffset:0} );
+    this.caret = caret || new Caret ( { nextLine:this.lines.head,nextOffset:0,nextLineOffset:0 } );
   }
   
   get linesCount () {
@@ -234,7 +301,14 @@ class Text {
     return this;
   }
   remove () {
-    this.resolveSelection();
+    if ( this.caret.prev && this.caret.prev.next == this.caret.next ) {
+      //console.log('remove', this.caret.prevOffset, this.caret.prevLine)
+      if ( this.caret.prevOffset !== undefined && this.caret.prevOffset !== -1 ) {
+        this.caret.prevLine.data.remove( this.caret.prevOffset-- ) }
+    } else {
+      this.resolveSelection();
+    }
+
     return this;
   }
 }
