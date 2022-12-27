@@ -22,19 +22,21 @@ class List {
       item.next = this.head;
       this.head = item;
 
-    } else if (index == 0) {
+    } else if ( index == 0 ) {
 
-      if (this.head == this.tail) {
+      if ( this.head == this.tail ) {
 
         this.tail = item;
         item.next = null;
 
-      } else if (this.head.next) {
+      } else if ( this.head.next ) {
 
+        this.head.next.prev = item;
         item.next = this.head.next;
-        item.next.prev = item;
 
       }
+
+      item.prev = this.head;
       this.head.next = item;
 
     } else if ( index > 0 ) {
@@ -81,36 +83,43 @@ class List {
   }
 
   find ( index ) {
-    let i = 0, item;
+    let i = 0, item, res = null;
+
     for ( item of this ) {
-      if ( i++ == index ) break;
+      if ( i++ == index ) {
+        res = item;
+        break;
+      }
     }
-    return item;
+
+    return res;
   }
 
   findNext ( index ) {
-    let i = 0, item;
+    let i = 0, item, res = null;
     for ( item of this ) {
       if ( i++ == index ) {
-        return item.next;
-      };
+        res = item.next;
+        break;
+      }
     }
-    return null;
+    return res;
   }
 
   findPrev ( index ) {
-    let i = 0, prev;
+    let i = 0, prev, res = null;
     for ( let item of this ) {
-      if ( i++ == index ) break;
+      if ( i++ == index ) {
+        res = prev;
+        break;
+      }
       prev = item;
     }
-    return prev;
+    return res;
   }
 
   remove ( index ) {
     let element = this.find( index );
-
-    console.log('remove', element)
     
     if ( element ) {
 
@@ -187,7 +196,6 @@ class Selection {
 class Caret {
   constructor ( { nextLine, nextOffset, nextLineOffset, prevLine, prevOffset, prevLineOffset, focus_orient_forward } = {} ) {
     Object.assign( this, { nextLine, nextOffset, nextLineOffset, prevLine, prevOffset, prevLineOffset, focus_orient_forward } );
-    //console.log('CARET', this.prev, this.next );
   }
 
   get prev () {
@@ -195,6 +203,7 @@ class Caret {
   }
 
   get next () {
+    console.log( 'GET NEXT', this.nextLine, this.nextOffset, this.nextLine.data.find( this.nextOffset ) )
     return this.nextLine && this.nextLine.data.find( this.nextOffset );
   }
 
@@ -258,10 +267,34 @@ class Text {
   }
 
   resolveSelection () {
-    if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine) {
-      this.caret.prevLine.next = this.caret.nextLine.next; this.caret.nextLine = this.caret.prevLine };
+
+    
+
     if (this.caret.prev && this.caret.prev !== this.caret.next ) {
-      this.caret.prev.next = this.caret.next; }
+      
+      this.caret.prev.next = this.caret.next; 
+      this.caret.next.prev = this.caret.prev;
+
+    } else if ( !this.caret.prev && this.caret.next.prev ) {
+
+      //console.log('RESOLVE SELECTION', this.caret.next)
+
+      this.caret.next.prev = null;
+      this.caret.prevLine.data.head = this.caret.next;
+
+      this.caret.nextOffset = this.caret.prevOffset + 1;
+
+      //console.log('RESOLVE SELECTION', this.caret.prevLine.data, this.caret.next)
+
+    }
+
+    if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine) {
+      
+      this.caret.prevLine.next = this.caret.nextLine.next; 
+      this.caret.nextLine.next.prev = this.caret.prevLine; 
+      this.caret.nextLine = this.caret.prevLine;
+
+    };
   }
 
   encodeInput ( keyCode, altKey, shiftKey ) {
@@ -269,7 +302,7 @@ class Text {
   }
 
   decodeInput ( value ) {
-    let a = Array.from( String(value), (num) => Number(num));
+    let a = Array.from( String(value), (num) => Number(num) );
 
     return {
       keyCode: Number(a.slice(0,-2).join('')),
@@ -302,7 +335,6 @@ class Text {
   }
   remove () {
     if ( this.caret.prev && this.caret.prev.next == this.caret.next ) {
-      //console.log('remove', this.caret.prevOffset, this.caret.prevLine)
       if ( this.caret.prevOffset !== undefined && this.caret.prevOffset !== -1 ) {
         this.caret.prevLine.data.remove( this.caret.prevOffset-- ) }
     } else {
@@ -350,8 +382,7 @@ function handleSelection ( state, {event,history}, dispatch ) {
 }
 
 const constrolActions = { keyup,keydown,keyleft,keyright,keyenter,keybackspace,keyescape,keyhome,keyend };
-const inputHandlers = { handleControl, handleSymbol }
-
+const inputHandlers = { handleControl, handleSymbol };
 
 class InputTranslator {
   constructor ( provider, startState ) 
