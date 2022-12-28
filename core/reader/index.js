@@ -123,7 +123,7 @@ class List {
     
     if ( element ) {
 
-      if ( !element.prev && !element.mext ) return;
+      if ( !element.prev && !element.next ) return;
 
       if ( element.prev && element.next ) {
 
@@ -203,11 +203,9 @@ class Caret {
   }
 
   get next () {
-    console.log( 'GET NEXT', this.nextLine, this.nextOffset, this.nextLine.data.find( this.nextOffset ) )
     return this.nextLine && this.nextLine.data.find( this.nextOffset );
   }
 
-  // orientation : a. focus ahead b. anchor ahead
   syncState( selection, lines ) {
     const focus_orient_forward =  selection.anchorLine - selection.focusLine <= 0 
       && selection.anchorOffset - selection.focusOffset <= 0;
@@ -268,28 +266,22 @@ class Text {
 
   resolveSelection () {
 
-    
-
     if (this.caret.prev && this.caret.prev !== this.caret.next ) {
-      
-      this.caret.prev.next = this.caret.next; 
+
       this.caret.next.prev = this.caret.prev;
+      this.caret.prev.next = this.caret.next;
 
     } else if ( !this.caret.prev && this.caret.next.prev ) {
-
-      //console.log('RESOLVE SELECTION', this.caret.next)
 
       this.caret.next.prev = null;
       this.caret.prevLine.data.head = this.caret.next;
 
-      this.caret.nextOffset = this.caret.prevOffset + 1;
-
-      //console.log('RESOLVE SELECTION', this.caret.prevLine.data, this.caret.next)
-
     }
 
+    this.caret.nextOffset = this.caret.prevOffset + 1;
+
     if (this.caret.prevLine && this.caret.prevLine !== this.caret.nextLine) {
-      
+
       this.caret.prevLine.next = this.caret.nextLine.next; 
       this.caret.nextLine.next.prev = this.caret.prevLine; 
       this.caret.nextLine = this.caret.prevLine;
@@ -336,7 +328,9 @@ class Text {
   remove () {
     if ( this.caret.prev && this.caret.prev.next == this.caret.next ) {
       if ( this.caret.prevOffset !== undefined && this.caret.prevOffset !== -1 ) {
-        this.caret.prevLine.data.remove( this.caret.prevOffset-- ) }
+        this.caret.prevLine.data.remove( this.caret.prevOffset-- ) 
+        this.caret.nextOffset = this.caret.prevOffset + 1;
+      }
     } else {
       this.resolveSelection();
     }
@@ -360,6 +354,7 @@ function keyenter ( state, dispatch ) {
 }
 function keybackspace ( state, dispatch ) {
   let text = state.text.remove();
+
   dispatch( { text } );
 }
 /* CONTROL FUNCTIONS END */
@@ -367,7 +362,7 @@ function keybackspace ( state, dispatch ) {
 function handleControl ( state, {event,history}, dispatch ) {
   let controlName = getControlName(event.keyCode);
   try { constrolActions[`key${controlName}`]( state, dispatch ); } 
-  catch (e) {}
+  catch (e) {console.error(e)}
 }
 
 function handleSymbol ( state, {event,history}, dispatch ) {
